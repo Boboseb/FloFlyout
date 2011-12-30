@@ -62,6 +62,7 @@ function FloFlyout_OnEvent(self, event, arg1, ...)
 		-- Ici, nous avons rechargé notre configuration
 		-- Initialise des trucs en dur pour commencer
 		FloFlyout:CreateOpener(_G["MultiBarBottomRightButton1"], 1, "UP")
+		FloFlyout:CreateOpener(_G["ActionButton2"], 1, "UP", 2)
 
 	elseif event == "UPDATE_BINDINGS" then
 
@@ -123,12 +124,13 @@ function FloFlyoutFrame_OnEvent(self, event, ...)
 end
 
 
-function FloFlyout:CreateOpener(actionButton, idFlyout, direction)
+function FloFlyout:CreateOpener(actionButton, idFlyout, direction, actionBarPage)
 
 	local floFlyoutFrame = _G["FloFlyoutFrame"]
-	local frame = CreateFrame("Button", "FloFlyoutOpener"..actionButton:GetName(), actionButton, "ActionButtonTemplate, SecureHandlerClickTemplate")
-	frame:SetAllPoints()
-	frame:SetAttribute("_onclick", [=[
+	local opener = CreateFrame("Button", "FloFlyoutOpener"..actionButton:GetName(), UIParent, "ActionButtonTemplate, SecureHandlerClickTemplate")
+	opener:SetAllPoints(actionButton)
+	opener:SetFrameStrata("DIALOG")
+	opener:SetAttribute("_onclick", [=[
 		local ref = self:GetFrameRef("FloFlyoutFrame")
 		local direction = "]=]..direction..[=["
 		local prevButton = nil;
@@ -199,10 +201,10 @@ function FloFlyout:CreateOpener(actionButton, idFlyout, direction)
 			end
 		end
 	]=])
-	frame:RegisterForClicks("AnyUp")
-	frame:SetFrameRef("FloFlyoutFrame", floFlyoutFrame)
-	frame:SetAttribute("spelllist", strjoin(",", unpack(self.Config[idFlyout].spells)))
-	frame:SetScript("PreClick", function(self, button, down)
+	opener:RegisterForClicks("AnyUp")
+	opener:SetFrameRef("FloFlyoutFrame", floFlyoutFrame)
+	opener:SetAttribute("spelllist", strjoin(",", unpack(self.Config[idFlyout].spells)))
+	opener:SetScript("PreClick", function(self, button, down)
 		local spellList = { strsplit(",", self:GetAttribute("spelllist")) }
 		local buttonList = { floFlyoutFrame:GetChildren() }
 		for i, buttonRef in ipairs(buttonList) do
@@ -251,8 +253,9 @@ function FloFlyout:CreateOpener(actionButton, idFlyout, direction)
 			floFlyoutFrame.HorizBg:SetPoint("LEFT", distance, 0)
 		end
 		floFlyoutFrame:SetBorderColor(0.7, 0.7, 0.7)
-	end) 
-	local icon = _G[frame:GetName().."Icon"]
+	end)
+
+	local icon = _G[opener:GetName().."Icon"]
 	if self.Config[idFlyout].icon then
 		icon:SetTexture(self.Config[idFlyout].icon)
 	else
@@ -260,25 +263,29 @@ function FloFlyout:CreateOpener(actionButton, idFlyout, direction)
 		icon:SetTexture(texture)
 	end
 
-	local flyoutArrow = _G[frame:GetName().."FlyoutArrow"]
+	local flyoutArrow = _G[opener:GetName().."FlyoutArrow"]
 	local arrowDistance = 2
 
 	-- Update arrow
 	flyoutArrow:Show()
 	flyoutArrow:ClearAllPoints()
 	if direction == "LEFT" then
-		flyoutArrow:SetPoint("LEFT", frame, "LEFT", -arrowDistance, 0)
+		flyoutArrow:SetPoint("LEFT", opener, "LEFT", -arrowDistance, 0)
 		SetClampedTextureRotation(flyoutArrow, 270)
 	elseif direction == "RIGHT" then
-		flyoutArrow:SetPoint("RIGHT", frame, "RIGHT", arrowDistance, 0)
+		flyoutArrow:SetPoint("RIGHT", opener, "RIGHT", arrowDistance, 0)
 		SetClampedTextureRotation(flyoutArrow, 90)
 	elseif direction == "DOWN" then
-		flyoutArrow:SetPoint("BOTTOM", frame, "BOTTOM", 0, -arrowDistance)
+		flyoutArrow:SetPoint("BOTTOM", opener, "BOTTOM", 0, -arrowDistance)
 		SetClampedTextureRotation(flyoutArrow, 180)
 	else
-		flyoutArrow:SetPoint("TOP", frame, "TOP", 0, arrowDistance)
+		flyoutArrow:SetPoint("TOP", opener, "TOP", 0, arrowDistance)
 		SetClampedTextureRotation(flyoutArrow, 0)
 	end
 
+	DEFAULT_CHAT_FRAME:AddMessage( "actionBarPage "..tostring(actionBarPage) )
+	if actionBarPage then
+		RegisterStateDriver(opener, "visibility", "[bar:"..actionBarPage.."] show; hide")
+	end
 end
 

@@ -1,0 +1,9 @@
+## Interface: 40300
+## Title: FloFlyout
+## Author: Floraline
+## Notes: Create custom Flyout buttons
+## OptionalDeps:
+## Dependencies:
+## SavedVariables:
+## SavedVariablesPerCharacter:
+FloFlyout.xml

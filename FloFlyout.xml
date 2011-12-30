@@ -1,0 +1,78 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\FrameXML\UI.xsd">
+	<Script file="FloFlyout.lua"/>
+
+	<Frame name="FloFlyoutListener">
+		<Scripts>
+			<OnLoad function="FloFlyout_OnLoad" />
+			<OnEvent function="FloFlyout_OnEvent" />
+		</Scripts>
+	</Frame>
+
+	<CheckButton name="FloFlyoutButtonTemplate" virtual="TRUE" inherits="ActionButtonTemplate, SecureActionButtonTemplate">
+		<Size x="28" y="28"/>
+		<Scripts>
+			<OnLoad>
+				self:RegisterForDrag("LeftButton")
+				_G[self:GetName().."Count"]:SetPoint("BOTTOMRIGHT", 0, 0)
+				self.maxDisplayCount = 99
+				_G[self:GetName().."Icon"]:SetTexCoord(4/64, 60/64, 4/64, 60/64)
+			</OnLoad>
+			<OnEnter>
+				SpellFlyoutButton_SetTooltip(self);
+			</OnEnter>
+			<OnLeave>
+				GameTooltip:Hide()
+			</OnLeave>
+			<OnDragStart>
+				if not self:GetParent().isActionBar or LOCK_ACTIONBAR ~= "1" or IsModifiedClick("PICKUPACTION") then
+					if self.spellID then
+						PickupSpell(spell.spellID)
+					end
+				end
+			</OnDragStart>
+			<PreClick>
+				self:SetChecked(not self:GetChecked());
+			</PreClick>
+		</Scripts>
+		<NormalTexture/>
+	</CheckButton>
+
+	<Frame name="FloFlyoutFrame" frameStrata="DIALOG" frameLevel="10" parent="UIParent" hidden="true">
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="FloFlyoutBackgroundEnd" inherits="ActionBarFlyoutButton-FlyoutTop" parentKey="BgEnd"/>
+				<Texture name="FloFlyoutHorizontalBackground" file="Interface\Buttons\ActionBarFlyoutButton-FlyoutMidLeft" parentKey="HorizBg" horizTile="true" hidden="true">
+					<Size x="32" y="37"/>
+					<TexCoords left="0" right="1" top="0" bottom="0.578125"/>
+				</Texture>
+				<Texture name="FloFlyoutVerticalBackground" file="Interface\Buttons\ActionBarFlyoutButton-FlyoutMid" parentKey="VertBg" vertTile="true" hidden="true">
+					<Size x="37" y="32"/>
+					<TexCoords left="0" right="0.578125" top="0" bottom="1"/>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Size>
+			<AbsDimension x="44" y="44"/>
+		</Size>
+		<Frames>
+			<CheckButton name="$parentButton1" inherits="FloFlyoutButtonTemplate" id="1" />
+			<CheckButton name="$parentButton2" inherits="FloFlyoutButtonTemplate" id="2" />
+			<CheckButton name="$parentButton3" inherits="FloFlyoutButtonTemplate" id="3" />
+			<CheckButton name="$parentButton4" inherits="FloFlyoutButtonTemplate" id="4" />
+			<CheckButton name="$parentButton5" inherits="FloFlyoutButtonTemplate" id="5" />
+			<CheckButton name="$parentButton6" inherits="FloFlyoutButtonTemplate" id="6" />
+			<CheckButton name="$parentButton7" inherits="FloFlyoutButtonTemplate" id="7" />
+			<CheckButton name="$parentButton8" inherits="FloFlyoutButtonTemplate" id="8" />
+			<CheckButton name="$parentButton9" inherits="FloFlyoutButtonTemplate" id="9" />
+			<CheckButton name="$parentButton10" inherits="FloFlyoutButtonTemplate" id="10" />
+		</Frames>
+		<Scripts>
+			<OnLoad function="SpellFlyout_OnLoad"/>
+			<OnShow function="SpellFlyout_OnShow"/>
+			<OnHide function="SpellFlyout_OnHide"/>
+			<OnEvent function="FloFlyoutFrame_OnEvent"/>
+		</Scripts>
+	</Frame>
+</Ui>
+

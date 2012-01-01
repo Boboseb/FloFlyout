@@ -13,7 +13,8 @@ local SPELLFLYOUT_FINAL_SPACING = 4;
 -------------------------------------------------------------------------------
 
 local FloFlyout = {
-	Config = {
+	openers = {},
+	config = {
 		[1] = {
 			spells = {
 				[1] = 8024,
@@ -45,24 +46,25 @@ function FloFlyout_OnLoad(self)
 
 	self:RegisterEvent("PLAYER_ENTERING_WORLD")
 	self:RegisterEvent("PLAYER_ALIVE")
-	self:RegisterEvent("SPELL_UPDATE_COOLDOWN")
-	self:RegisterEvent("ACTIONBAR_UPDATE_USABLE")
+	--self:RegisterEvent("SPELL_UPDATE_COOLDOWN")
+	--self:RegisterEvent("ACTIONBAR_UPDATE_USABLE")
 	self:RegisterEvent("UPDATE_BINDINGS")
 
 end
 
 function FloFlyout_OnEvent(self, event, arg1, ...)
 
-	if event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_ALIVE" then
+	if event == "PLAYER_ENTERING_WORLD" --[[or event == "PLAYER_ALIVE"]] then
+		-- Initialise des trucs en dur pour commencer
+		FloFlyout:BindFlyoutToAction(1, 13)
+		FloFlyout:BindFlyoutToAction(1, 49)
+		FloFlyout:BindFlyoutToAction(1, 25)
 
-	elseif event == "SPELL_UPDATE_COOLDOWN" or event == "ACTIONBAR_UPDATE_USABLE" then
+	--elseif event == "SPELL_UPDATE_COOLDOWN" or event == "ACTIONBAR_UPDATE_USABLE" then
 
 	elseif event == "ADDON_LOADED" and arg1 == NAME then
 
 		-- Ici, nous avons rechargé notre configuration
-		-- Initialise des trucs en dur pour commencer
-		FloFlyout:CreateOpener(_G["MultiBarBottomRightButton1"], 1, "UP")
-		FloFlyout:CreateOpener(_G["ActionButton2"], 1, "UP", 2)
 
 	elseif event == "UPDATE_BINDINGS" then
 
@@ -123,11 +125,57 @@ function FloFlyoutFrame_OnEvent(self, event, ...)
 	end
 end
 
+function FloFlyout:BindFlyoutToAction(idFlyout, idAction)
 
-function FloFlyout:CreateOpener(actionButton, idFlyout, direction, actionBarPage)
+	local direction, actionButton, actionBarPage
+	direction = "UP"
+
+	if idAction <= 12 then
+		actionBarPage = 1
+		actionButton = _G["ActionButton"..idAction]
+	elseif idAction <= 24 then
+		actionBarPage = 2
+		actionButton = _G["ActionButton"..(idAction - 12)]
+	elseif idAction <= 36 then
+		if SHOW_MULTI_ACTIONBAR_3 then
+			actionButton = _G["MultiBarRightButton"..(idAction - 24)]
+			direction = "LEFT"
+		else
+			actionBarPage = 3
+			actionButton = _G["ActionButton"..(idAction - 24)]
+		end
+	elseif idAction <= 48 then
+		if SHOW_MULTI_ACTIONBAR_4 then
+			actionButton = _G["MultiBarLeftButton"..(idAction - 36)]
+			direction = "RIGHT"
+		else
+			actionBarPage = 4
+			actionButton = _G["ActionButton"..(idAction - 36)]
+		end
+	elseif idAction <= 60 then
+		if SHOW_MULTI_ACTIONBAR_2 then
+			actionButton = _G["MultiBarBottomRightButton"..(idAction - 48)]
+		else
+			actionBarPage = 5
+			actionButton = _G["ActionButton"..(idAction - 48)]
+		end
+	elseif idAction <= 72 then
+		if SHOW_MULTI_ACTIONBAR_1 then
+			actionButton = _G["MultiBarBottomLeftButton"..(idAction - 60)]
+		else
+			actionBarPage = 6
+			actionButton = _G["ActionButton"..(idAction - 60)]
+		end
+	end
+
+	FloFlyout:CreateOpener("FloFlyoutOpener"..idAction, idFlyout, direction, actionButton, actionBarPage)
+end
+
+function FloFlyout:CreateOpener(name, idFlyout, direction, actionButton, actionBarPage)
 
 	local floFlyoutFrame = _G["FloFlyoutFrame"]
-	local opener = CreateFrame("Button", "FloFlyoutOpener"..actionButton:GetName(), UIParent, "ActionButtonTemplate, SecureHandlerClickTemplate")
+	local opener = CreateFrame("Button", name, UIParent, "ActionButtonTemplate, SecureHandlerClickTemplate")
+	self.openers[name] = opener
 	opener:SetAllPoints(actionButton)
 	opener:SetFrameStrata("DIALOG")
 	opener:SetAttribute("_onclick", [=[
@@ -139,7 +187,7 @@ function FloFlyout:CreateOpener(actionButton, idFlyout, direction, actionBarPage
 			ref:Hide()
 		else
 			ref:Show()
-			ref:RegisterAutoHide(2)
+			ref:RegisterAutoHide(1)
 			ref:AddToAutoHide(self)
 			ref:ClearAllPoints()
 			if direction == "UP" then
@@ -156,6 +204,7 @@ function FloFlyout:CreateOpener(actionButton, idFlyout, direction, actionBarPage
 			local buttonList = table.new(ref:GetChildren())
 			for i, buttonRef in ipairs(buttonList) do
 				if spellList[i] then
+					buttonRef:ClearAllPoints()
 					if direction == "UP" then
 						if prevButton then
 							buttonRef:SetPoint("BOTTOM", prevButton, "TOP", 0, ]=]..SPELLFLYOUT_DEFAULT_SPACING..[=[)
@@ -203,7 +252,7 @@ function FloFlyout:CreateOpener(actionButton, idFlyout, direction, actionBarPage
 	]=])
 	opener:RegisterForClicks("AnyUp")
 	opener:SetFrameRef("FloFlyoutFrame", floFlyoutFrame)
-	opener:SetAttribute("spelllist", strjoin(",", unpack(self.Config[idFlyout].spells)))
+	opener:SetAttribute("spelllist", strjoin(",", unpack(self.config[idFlyout].spells)))
 	opener:SetScript("PreClick", function(self, button, down)
 		local spellList = { strsplit(",", self:GetAttribute("spelllist")) }
 		local buttonList = { floFlyoutFrame:GetChildren() }
@@ -219,6 +268,7 @@ function FloFlyout:CreateOpener(actionButton, idFlyout, direction, actionBarPage
 			end
 		end
 		floFlyoutFrame.BgEnd:ClearAllPoints()
+		local distance = 3
 		if direction == "UP" then
 			floFlyoutFrame.BgEnd:SetPoint("TOP")
 			SetClampedTextureRotation(floFlyoutFrame.BgEnd, 0)
@@ -256,10 +306,10 @@ function FloFlyout:CreateOpener(actionButton, idFlyout, direction, actionBarPage
 	end)
 
 	local icon = _G[opener:GetName().."Icon"]
-	if self.Config[idFlyout].icon then
-		icon:SetTexture(self.Config[idFlyout].icon)
+	if self.config[idFlyout].icon then
+		icon:SetTexture(self.config[idFlyout].icon)
 	else
-		local texture = GetSpellTexture(self.Config[idFlyout].spells[1])
+		local texture = GetSpellTexture(self.config[idFlyout].spells[1])
 		icon:SetTexture(texture)
 	end
 
@@ -283,7 +333,6 @@ function FloFlyout:CreateOpener(actionButton, idFlyout, direction, actionBarPage
 		SetClampedTextureRotation(flyoutArrow, 0)
 	end
 
-	DEFAULT_CHAT_FRAME:AddMessage( "actionBarPage "..tostring(actionBarPage) )
 	if actionBarPage then
 		RegisterStateDriver(opener, "visibility", "[bar:"..actionBarPage.."] show; hide")
 	end

@@ -5,5 +5,5 @@
 ## OptionalDeps:
 ## Dependencies:
 ## SavedVariables:
-## SavedVariablesPerCharacter:
+## SavedVariablesPerCharacter: FLOFLYOUT_CONFIG
 FloFlyout.xml

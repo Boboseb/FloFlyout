@@ -12,33 +12,85 @@ local SPELLFLYOUT_FINAL_SPACING = 4;
 -- Variables
 -------------------------------------------------------------------------------
 
+FLOFLYOUT_CONFIG = {
+		flyouts = {
+			--[[ Sample config : each flyout can have a list of spell and an icon
+			[1] = {
+				spells = {
+					[1] = 8024, -- Flametongue
+					[2] = 8033, -- Frostbite
+					[3] = 8232, -- Windfury
+					[4] = 8017, -- RockBite
+					[5] = 51730, -- earthliving
+				},
+				icon = ""
+			},
+			]]
+		},
+		actions = {
+			[1] = {
+				--[[ Sample config : for each talent group there is a list of actions bound to flyouts
+				[13] = 1,
+				[49] = 1,
+				[25] = 1,
+				]]
+			},
+			[2] = {
+			},
+		}
+	};
+
 local FloFlyout = {
 	openers = {},
-	config = {
-		[1] = {
-			spells = {
-				[1] = 8024,
-				[2] = 8033,
-				[3] = 8232,
-				[4] = 8017,
-				[5] = 51730,
-			}
-		},
-	}
+	config = FLOFLYOUT_CONFIG
 }
 
 -------------------------------------------------------------------------------
 -- Functions
 -------------------------------------------------------------------------------
 
+local function FloFlyout_ReadCmd(line)
+	local i, v, flyoutid;
+	local cmd, arg1, arg2 = strsplit(' ', line or "", 3);
+
+	if cmd == "addflyout" then
+		DEFAULT_CHAT_FRAME:AddMessage("New flyout : "..FloFlyout:AddFlyout())
+	elseif cmd == "removeflyout" and FloFlyout:IsValidFlyoutId(arg1) then
+		FloFlyout:RemoveFlyout(arg1)
+		FloFlyout:ApplyConfig()
+	elseif cmd == "addspell" and FloFlyout:IsValidFlyoutId(arg1) and tonumber(arg2) then
+		DEFAULT_CHAT_FRAME:AddMessage("New spell : "..FloFlyout:AddSpell(arg1, arg2))
+		FloFlyout:ApplyConfig()
+	elseif cmd == "removespell" and FloFlyout:IsValidFlyoutId(arg1) and FloFlyout:IsValidSpellPos(arg1, arg2) then
+		FloFlyout:RemoveSpell(arg1, arg2)
+		FloFlyout:ApplyConfig()
+	elseif cmd == "bind" and tonumber(arg1) and FloFlyout:IsValidFlyoutId(arg2) then
+		FloFlyout:AddAction(arg1, arg2)
+		FloFlyout:ApplyConfig()
+	elseif cmd == "unbind" and tonumber(arg1) then
+		FloFlyout:RemoveAction(arg1)
+		FloFlyout:ApplyConfig()
+	else
+		DEFAULT_CHAT_FRAME:AddMessage( "FloFlyout usage :" );
+		DEFAULT_CHAT_FRAME:AddMessage( "/ffo addflyout : add a new flyout" );
+		DEFAULT_CHAT_FRAME:AddMessage( "/ffo removeflyout <flyoutid> : remove flyout" );
+		DEFAULT_CHAT_FRAME:AddMessage( "/ffo addspell <flyoutid> <spellid> : add a new spell to flyout" );
+		DEFAULT_CHAT_FRAME:AddMessage( "/ffo removespell <flyoutid> <spellpos> : remove spell from flyout" );
+		DEFAULT_CHAT_FRAME:AddMessage( "/ffo bind <actionid> <flyoutid> : bind action to flyout" );
+		DEFAULT_CHAT_FRAME:AddMessage( "/ffo unbind <actionid> : unbind action" );
+		DEFAULT_CHAT_FRAME:AddMessage( "/ffo panic||reset : Reset FloFlyout" );
+		return;
+	end
+end
+
 -- Executed on load, calls general set-up functions
 function FloFlyout_OnLoad(self)
 
 	DEFAULT_CHAT_FRAME:AddMessage( NAME.." "..VERSION.." loaded." )
 
-	--SLASH_FLOTOTEMBAR1 = "/flototembar"
-	--SLASH_FLOTOTEMBAR2 = "/ftb"
-	--SlashCmdList["FLOTOTEMBAR"] = FloTotemBar_ReadCmd
+	SLASH_FLOFLYOUT1 = "/floflyout"
+	SLASH_FLOFLYOUT2 = "/ffo"
+	SlashCmdList["FLOFLYOUT"] = FloFlyout_ReadCmd
 
 	self:RegisterEvent("ADDON_LOADED")
 	--self:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED")
@@ -55,21 +107,19 @@ end
 function FloFlyout_OnEvent(self, event, arg1, ...)
 
 	if event == "PLAYER_ENTERING_WORLD" --[[or event == "PLAYER_ALIVE"]] then
-		-- Initialise des trucs en dur pour commencer
-		--FloFlyout:BindFlyoutToAction(1, 13)
-		--FloFlyout:BindFlyoutToAction(1, 49)
-		--FloFlyout:BindFlyoutToAction(1, 25)
+		FloFlyout:ApplyConfig()
 
 	--elseif event == "SPELL_UPDATE_COOLDOWN" or event == "ACTIONBAR_UPDATE_USABLE" then
 
 	elseif event == "ADDON_LOADED" and arg1 == NAME then
 
 		-- Ici, nous avons rechargé notre configuration
+		FloFlyout.config = FLOFLYOUT_CONFIG
 
 	elseif event == "UPDATE_BINDINGS" then
 
 	elseif event == "ACTIVE_TALENT_GROUP_CHANGED" then
-
+		FloFlyout:ApplyConfig()
 	else
 
 	end
@@ -252,7 +302,7 @@ function FloFlyout:CreateOpener(name, idFlyout, direction, actionButton, actionB
 	]=])
 	opener:RegisterForClicks("AnyUp")
 	opener:SetFrameRef("FloFlyoutFrame", floFlyoutFrame)
-	opener:SetAttribute("spelllist", strjoin(",", unpack(self.config[idFlyout].spells)))
+	opener:SetAttribute("spelllist", strjoin(",", unpack(self.config.flyouts[idFlyout].spells)))
 	opener:SetScript("PreClick", function(self, button, down)
 		local spellList = { strsplit(",", self:GetAttribute("spelllist")) }
 		local buttonList = { floFlyoutFrame:GetChildren() }
@@ -306,10 +356,10 @@ function FloFlyout:CreateOpener(name, idFlyout, direction, actionButton, actionB
 	end)
 
 	local icon = _G[opener:GetName().."Icon"]
-	if self.config[idFlyout].icon then
-		icon:SetTexture(self.config[idFlyout].icon)
+	if self.config.flyouts[idFlyout].icon then
+		icon:SetTexture(self.config.flyouts[idFlyout].icon)
 	else
-		local texture = GetSpellTexture(self.config[idFlyout].spells[1])
+		local texture = GetSpellTexture(self.config.flyouts[idFlyout].spells[1])
 		icon:SetTexture(texture)
 	end
 
@@ -335,14 +385,78 @@ function FloFlyout:CreateOpener(name, idFlyout, direction, actionButton, actionB
 
 	if actionBarPage then
 		RegisterStateDriver(opener, "visibility", "[bar:"..actionBarPage.."] show; hide")
+	else
+		opener:Show()
 	end
 end
 
 function FloFlyout:ClearOpeners()
-
 	for name, opener in pairs(self.openers) do
 		opener:Hide()
 		UnregisterStateDriver(opener, "visibility")
 	end
-
 end
+
+function FloFlyout:ApplyConfig()
+	self:ClearOpeners()
+	for a,f in pairs(self.config.actions[GetActiveTalentGroup()]) do
+		self:BindFlyoutToAction(f, a)
+	end
+end
+
+function FloFlyout:IsValidFlyoutId(arg1)
+	local id = tonumber(arg1)
+	return id and self.config.flyouts[id]
+end
+
+function FloFlyout:IsValidSpellPos(flyoutId, arg2)
+	if type(flyoutId) == "string" then flyoutId = tonumber(flyoutId) end
+	local pos = tonumber(arg2)
+	return pos and self.config.flyouts[flyoutId].spells[pos]
+end
+
+function FloFlyout:AddFlyout()
+	table.insert(self.config.flyouts, { spells = {} })
+	return #self.config.flyouts
+end
+
+function FloFlyout:RemoveFlyout(flyoutId)
+	if type(flyoutId) == "string" then flyoutId = tonumber(flyoutId) end
+	table.remove(self.config.flyouts, flyoutId)
+	-- shift references
+	local i, a, f
+	for i = 1, 2 do
+		for a,f in pairs(self.config.actions[i]) do
+			if f == flyoutId then
+				self.config.actions[i][a] = nil
+			elseif f > flyoutId then
+				self.config.actions[i][a] = f - 1
+			end
+		end
+	end
+end
+
+function FloFlyout:AddSpell(flyoutId, spellId)
+	if type(flyoutId) == "string" then flyoutId = tonumber(flyoutId) end
+	if type(spellId) == "string" then spellId = tonumber(spellId) end
+	table.insert(self.config.flyouts[flyoutId].spells, spellId)
+	return #self.config.flyouts[flyoutId].spells
+end
+
+function FloFlyout:RemoveSpell(flyoutId, spellPos)
+	if type(flyoutId) == "string" then flyoutId = tonumber(flyoutId) end
+	if type(spellPos) == "string" then spellPos = tonumber(spellPos) end
+	table.remove(self.config.flyouts[flyoutId].spells, spellPos)
+end
+
+function FloFlyout:AddAction(actionId, flyoutId)
+	if type(actionId) == "string" then actionId = tonumber(actionId) end
+	if type(flyoutId) == "string" then flyoutId = tonumber(flyoutId) end
+	self.config.actions[GetActiveTalentGroup()][actionId] = flyoutId
+end
+
+function FloFlyout:RemoveAction(actionId)
+	if type(actionId) == "string" then actionId = tonumber(actionId) end
+	self.config.actions[GetActiveTalentGroup()][actionId] = nil
+end
+

@@ -56,9 +56,9 @@ function FloFlyout_OnEvent(self, event, arg1, ...)
 
 	if event == "PLAYER_ENTERING_WORLD" --[[or event == "PLAYER_ALIVE"]] then
 		-- Initialise des trucs en dur pour commencer
-		FloFlyout:BindFlyoutToAction(1, 13)
-		FloFlyout:BindFlyoutToAction(1, 49)
-		FloFlyout:BindFlyoutToAction(1, 25)
+		--FloFlyout:BindFlyoutToAction(1, 13)
+		--FloFlyout:BindFlyoutToAction(1, 49)
+		--FloFlyout:BindFlyoutToAction(1, 25)
 
 	--elseif event == "SPELL_UPDATE_COOLDOWN" or event == "ACTIONBAR_UPDATE_USABLE" then
 
@@ -174,7 +174,7 @@ end
 function FloFlyout:CreateOpener(name, idFlyout, direction, actionButton, actionBarPage)
 
 	local floFlyoutFrame = _G["FloFlyoutFrame"]
-	local opener = CreateFrame("Button", name, UIParent, "ActionButtonTemplate, SecureHandlerClickTemplate")
+	local opener = self.openers[name] or CreateFrame("Button", name, UIParent, "ActionButtonTemplate, SecureHandlerClickTemplate")
 	self.openers[name] = opener
 	opener:SetAllPoints(actionButton)
 	opener:SetFrameStrata("DIALOG")
@@ -338,3 +338,11 @@ function FloFlyout:CreateOpener(name, idFlyout, direction, actionButton, actionB
 	end
 end
 
+function FloFlyout:ClearOpeners()
+
+	for name, opener in pairs(self.openers) do
+		opener:Hide()
+		UnregisterStateDriver(opener, "visibility")
+	end
+
+end

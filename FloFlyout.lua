@@ -358,7 +358,7 @@ function FloFlyout:CreateOpener(name, idFlyout, direction, actionButton, actionB
 	local icon = _G[opener:GetName().."Icon"]
 	if self.config.flyouts[idFlyout].icon then
 		icon:SetTexture(self.config.flyouts[idFlyout].icon)
-	else
+	elseif self.config.flyouts[idFlyout].spells[1] then
 		local texture = GetSpellTexture(self.config.flyouts[idFlyout].spells[1])
 		icon:SetTexture(texture)
 	end

@@ -177,10 +177,11 @@ end
 
 function FloFlyout:BindFlyoutToAction(idFlyout, idAction)
 
-	local direction, actionButton, actionBarPage
+	local direction, actionButton, actionBarPage, bonusBar
 	direction = "UP"
 
 	if idAction <= 12 then
+		bonusBar = 0
 		actionBarPage = 1
 		actionButton = _G["ActionButton"..idAction]
 	elseif idAction <= 24 then
@@ -216,12 +217,28 @@ function FloFlyout:BindFlyoutToAction(idFlyout, idAction)
 			actionBarPage = 6
 			actionButton = _G["ActionButton"..(idAction - 60)]
 		end
+	elseif idAction <= 84 then
+		bonusBar = 1
+		actionBarPage = 1
+		actionButton = _G["ActionButton"..(idAction - 72)]
+	elseif idAction <= 96 then
+		bonusBar = 2
+		actionBarPage = 1
+		actionButton = _G["ActionButton"..(idAction - 84)]
+	elseif idAction <= 108 then
+		bonusBar = 3
+		actionBarPage = 1
+		actionButton = _G["ActionButton"..(idAction - 96)]
+	elseif idAction <= 120 then
+		bonusBar = 4
+		actionBarPage = 1
+		actionButton = _G["ActionButton"..(idAction - 108)]
 	end
 
-	FloFlyout:CreateOpener("FloFlyoutOpener"..idAction, idFlyout, direction, actionButton, actionBarPage)
+	FloFlyout:CreateOpener("FloFlyoutOpener"..idAction, idFlyout, direction, actionButton, actionBarPage, bonusBar)
 end
 
-function FloFlyout:CreateOpener(name, idFlyout, direction, actionButton, actionBarPage)
+function FloFlyout:CreateOpener(name, idFlyout, direction, actionButton, actionBarPage, bonusBar)
 
 	local floFlyoutFrame = _G["FloFlyoutFrame"]
 	local opener = self.openers[name] or CreateFrame("Button", name, UIParent, "ActionButtonTemplate, SecureHandlerClickTemplate")
@@ -383,8 +400,15 @@ function FloFlyout:CreateOpener(name, idFlyout, direction, actionButton, actionB
 		SetClampedTextureRotation(flyoutArrow, 0)
 	end
 
+	local stateCondition = ""
 	if actionBarPage then
-		RegisterStateDriver(opener, "visibility", "[bar:"..actionBarPage.."] show; hide")
+		stateCondition = "bar:"..actionBarPage
+	end
+	if bonusBar then
+		stateCondition = stateCondition..",bonusbar:"..bonusBar
+	end
+	if stateCondition ~= "" then
+		RegisterStateDriver(opener, "visibility", "["..stateCondition.."] show; hide")
 	else
 		opener:Show()
 	end

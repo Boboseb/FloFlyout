@@ -238,139 +238,183 @@ function FloFlyout:BindFlyoutToAction(idFlyout, idAction)
 	FloFlyout:CreateOpener("FloFlyoutOpener"..idAction, idFlyout, direction, actionButton, actionBarPage, bonusBar)
 end
 
-function FloFlyout:CreateOpener(name, idFlyout, direction, actionButton, actionBarPage, bonusBar)
+local function Opener_UpdateFlyout(self)
+	-- Update border and determine arrow position
+	local arrowDistance;
+	if ((FloFlyoutFrame and FloFlyoutFrame:IsShown() and FloFlyoutFrame:GetParent() == self) or GetMouseFocus() == self) then
+		self.FlyoutBorder:Show();
+		self.FlyoutBorderShadow:Show();
+		arrowDistance = 5;
+	else
+		self.FlyoutBorder:Hide();
+		self.FlyoutBorderShadow:Hide();
+		arrowDistance = 2;
+	end
 
-	local floFlyoutFrame = _G["FloFlyoutFrame"]
-	local opener = self.openers[name] or CreateFrame("Button", name, UIParent, "ActionButtonTemplate, SecureHandlerClickTemplate")
-	self.openers[name] = opener
-	opener:SetAllPoints(actionButton)
-	opener:SetFrameStrata("DIALOG")
-	opener:SetAttribute("_onclick", [=[
-		local ref = self:GetFrameRef("FloFlyoutFrame")
-		local direction = "]=]..direction..[=["
-		local prevButton = nil;
+	-- Update arrow
+	self.FlyoutArrow:Show();
+	self.FlyoutArrow:ClearAllPoints();
+	local direction = self:GetAttribute("flyoutDirection");
+	if (direction == "LEFT") then
+		self.FlyoutArrow:SetPoint("LEFT", self, "LEFT", -arrowDistance, 0);
+		SetClampedTextureRotation(self.FlyoutArrow, 270);
+	elseif (direction == "RIGHT") then
+		self.FlyoutArrow:SetPoint("RIGHT", self, "RIGHT", arrowDistance, 0);
+		SetClampedTextureRotation(self.FlyoutArrow, 90);
+	elseif (direction == "DOWN") then
+		self.FlyoutArrow:SetPoint("BOTTOM", self, "BOTTOM", 0, -arrowDistance);
+		SetClampedTextureRotation(self.FlyoutArrow, 180);
+	else
+		self.FlyoutArrow:SetPoint("TOP", self, "TOP", 0, arrowDistance);
+		SetClampedTextureRotation(self.FlyoutArrow, 0);
+	end
+end
 
-		if ref:IsShown() then
-			ref:Hide()
-		else
-			ref:Show()
-			ref:RegisterAutoHide(1)
-			ref:AddToAutoHide(self)
-			ref:ClearAllPoints()
-			if direction == "UP" then
-				ref:SetPoint("BOTTOM", self, "TOP", 0, 0)
-			elseif direction == "DOWN" then
-				ref:SetPoint("TOP", self, "BOTTOM", 0, 0)
-			elseif direction == "LEFT" then
-				ref:SetPoint("RIGHT", self, "LEFT", 0, 0)
-			elseif direction == "RIGHT" then
-				ref:SetPoint("LEFT", self, "RIGHT", 0, 0)
-			end
-
-			local spellList = table.new(strsplit(",", self:GetAttribute("spelllist")))
-			local buttonList = table.new(ref:GetChildren())
-			for i, buttonRef in ipairs(buttonList) do
-				if spellList[i] then
-					buttonRef:ClearAllPoints()
-					if direction == "UP" then
-						if prevButton then
-							buttonRef:SetPoint("BOTTOM", prevButton, "TOP", 0, ]=]..SPELLFLYOUT_DEFAULT_SPACING..[=[)
-						else
-							buttonRef:SetPoint("BOTTOM", "$parent", 0, ]=]..SPELLFLYOUT_INITIAL_SPACING..[=[)
-						end
-					elseif direction == "DOWN" then
-						if prevButton then
-							buttonRef:SetPoint("TOP", prevButton, "BOTTOM", 0, -]=]..SPELLFLYOUT_DEFAULT_SPACING..[=[)
-						else
-							buttonRef:SetPoint("TOP", "$parent", 0, -]=]..SPELLFLYOUT_INITIAL_SPACING..[=[)
-						end
-					elseif direction == "LEFT" then
-						if prevButton then
-							buttonRef:SetPoint("RIGHT", prevButton, "LEFT", -]=]..SPELLFLYOUT_DEFAULT_SPACING..[=[, 0)
-						else
-							buttonRef:SetPoint("RIGHT", "$parent", -]=]..SPELLFLYOUT_INITIAL_SPACING..[=[, 0)
-						end
-					elseif direction == "RIGHT" then
-						if prevButton then
-							buttonRef:SetPoint("LEFT", prevButton, "RIGHT", ]=]..SPELLFLYOUT_DEFAULT_SPACING..[=[, 0)
-						else
-							buttonRef:SetPoint("LEFT", "$parent", ]=]..SPELLFLYOUT_INITIAL_SPACING..[=[, 0)
-						end
-					end
-
-					buttonRef:SetAttribute("type", "spell")
-					buttonRef:SetAttribute("spell", spellList[i])
-					buttonRef:Show()
-
-					prevButton = buttonRef
-				else
-					buttonRef:Hide()
-				end
-			end
-			local numButtons = table.maxn(spellList)
-			if direction == "UP" or direction == "DOWN" then
-				ref:SetWidth(prevButton:GetWidth())
-				ref:SetHeight((prevButton:GetHeight()+]=]..SPELLFLYOUT_DEFAULT_SPACING..[=[) * numButtons - ]=]..SPELLFLYOUT_DEFAULT_SPACING..[=[ + ]=]..SPELLFLYOUT_INITIAL_SPACING..[=[ + ]=]..SPELLFLYOUT_FINAL_SPACING..[=[)
-			else
-				ref:SetHeight(prevButton:GetHeight())
-				ref:SetWidth((prevButton:GetWidth()+]=]..SPELLFLYOUT_DEFAULT_SPACING..[=[) * numButtons - ]=]..SPELLFLYOUT_DEFAULT_SPACING..[=[ + ]=]..SPELLFLYOUT_INITIAL_SPACING..[=[ + ]=]..SPELLFLYOUT_FINAL_SPACING..[=[)
-			end
+local function Opener_PreClick(self, button, down)
+	local direction = self:GetAttribute("flyoutDirection");
+	local spellList = { strsplit(",", self:GetAttribute("spelllist")) }
+	local buttonList = { FloFlyoutFrame:GetChildren() }
+	for i, buttonRef in ipairs(buttonList) do
+		if spellList[i] then
+			buttonRef.spellID = spellList[i]
+			local icon = GetSpellTexture(spellList[i])
+			_G[buttonRef:GetName().."Icon"]:SetTexture(icon)
+			SpellFlyoutButton_UpdateCooldown(buttonRef)
+			SpellFlyoutButton_UpdateState(buttonRef)
+			SpellFlyoutButton_UpdateUsable(buttonRef)
+			SpellFlyoutButton_UpdateCount(buttonRef)
 		end
-	]=])
-	opener:RegisterForClicks("AnyUp")
-	opener:SetFrameRef("FloFlyoutFrame", floFlyoutFrame)
-	opener:SetAttribute("spelllist", strjoin(",", unpack(self.config.flyouts[idFlyout].spells)))
-	opener:SetScript("PreClick", function(self, button, down)
-		local spellList = { strsplit(",", self:GetAttribute("spelllist")) }
-		local buttonList = { floFlyoutFrame:GetChildren() }
+	end
+	FloFlyoutFrame.BgEnd:ClearAllPoints()
+	local distance = 3
+	if direction == "UP" then
+		FloFlyoutFrame.BgEnd:SetPoint("TOP")
+		SetClampedTextureRotation(FloFlyoutFrame.BgEnd, 0)
+		FloFlyoutFrame.HorizBg:Hide()
+		FloFlyoutFrame.VertBg:Show()
+		FloFlyoutFrame.VertBg:ClearAllPoints()
+		FloFlyoutFrame.VertBg:SetPoint("TOP", FloFlyoutFrame.BgEnd, "BOTTOM")
+		FloFlyoutFrame.VertBg:SetPoint("BOTTOM", 0, distance)
+	elseif direction == "DOWN" then
+		FloFlyoutFrame.BgEnd:SetPoint("BOTTOM")
+		SetClampedTextureRotation(FloFlyoutFrame.BgEnd, 180)
+		FloFlyoutFrame.HorizBg:Hide()
+		FloFlyoutFrame.VertBg:Show()
+		FloFlyoutFrame.VertBg:ClearAllPoints()
+		FloFlyoutFrame.VertBg:SetPoint("BOTTOM", self.BgEnd, "TOP")
+		FloFlyoutFrame.VertBg:SetPoint("TOP", 0, -distance)
+	elseif direction == "LEFT" then
+		FloFlyoutFrame.BgEnd:SetPoint("LEFT")
+		SetClampedTextureRotation(FloFlyoutFrame.BgEnd, 270)
+		FloFlyoutFrame.VertBg:Hide()
+		FloFlyoutFrame.HorizBg:Show()
+		FloFlyoutFrame.HorizBg:ClearAllPoints()
+		FloFlyoutFrame.HorizBg:SetPoint("LEFT", FloFlyoutFrame.BgEnd, "RIGHT")
+		FloFlyoutFrame.HorizBg:SetPoint("RIGHT", -distance, 0)
+	elseif direction == "RIGHT" then
+		FloFlyoutFrame.BgEnd:SetPoint("RIGHT")
+		SetClampedTextureRotation(FloFlyoutFrame.BgEnd, 90)
+		FloFlyoutFrame.VertBg:Hide()
+		FloFlyoutFrame.HorizBg:Show()
+		FloFlyoutFrame.HorizBg:ClearAllPoints()
+		FloFlyoutFrame.HorizBg:SetPoint("RIGHT", FloFlyoutFrame.BgEnd, "LEFT")
+		FloFlyoutFrame.HorizBg:SetPoint("LEFT", distance, 0)
+	end
+	FloFlyoutFrame:SetBorderColor(0.7, 0.7, 0.7)
+end
+
+local snippet_Opener_Click = [=[
+	local ref = self:GetFrameRef("FloFlyoutFrame")
+	local direction = self:GetAttribute("flyoutDirection")
+	local prevButton = nil;
+
+	if ref:IsShown() then
+		ref:Hide()
+	else
+		ref:Show()
+		ref:RegisterAutoHide(1)
+		ref:AddToAutoHide(self)
+		ref:ClearAllPoints()
+		if direction == "UP" then
+			ref:SetPoint("BOTTOM", self, "TOP", 0, 0)
+		elseif direction == "DOWN" then
+			ref:SetPoint("TOP", self, "BOTTOM", 0, 0)
+		elseif direction == "LEFT" then
+			ref:SetPoint("RIGHT", self, "LEFT", 0, 0)
+		elseif direction == "RIGHT" then
+			ref:SetPoint("LEFT", self, "RIGHT", 0, 0)
+		end
+
+		local spellList = table.new(strsplit(",", self:GetAttribute("spelllist")))
+		local buttonList = table.new(ref:GetChildren())
 		for i, buttonRef in ipairs(buttonList) do
 			if spellList[i] then
-				buttonRef.spellID = spellList[i]
-				local icon = GetSpellTexture(spellList[i])
-				_G[buttonRef:GetName().."Icon"]:SetTexture(icon)
-				SpellFlyoutButton_UpdateCooldown(buttonRef)
-				SpellFlyoutButton_UpdateState(buttonRef)
-				SpellFlyoutButton_UpdateUsable(buttonRef)
-				SpellFlyoutButton_UpdateCount(buttonRef)
+				buttonRef:ClearAllPoints()
+				if direction == "UP" then
+					if prevButton then
+						buttonRef:SetPoint("BOTTOM", prevButton, "TOP", 0, ]=]..SPELLFLYOUT_DEFAULT_SPACING..[=[)
+					else
+						buttonRef:SetPoint("BOTTOM", "$parent", 0, ]=]..SPELLFLYOUT_INITIAL_SPACING..[=[)
+					end
+				elseif direction == "DOWN" then
+					if prevButton then
+						buttonRef:SetPoint("TOP", prevButton, "BOTTOM", 0, -]=]..SPELLFLYOUT_DEFAULT_SPACING..[=[)
+					else
+						buttonRef:SetPoint("TOP", "$parent", 0, -]=]..SPELLFLYOUT_INITIAL_SPACING..[=[)
+					end
+				elseif direction == "LEFT" then
+					if prevButton then
+						buttonRef:SetPoint("RIGHT", prevButton, "LEFT", -]=]..SPELLFLYOUT_DEFAULT_SPACING..[=[, 0)
+					else
+						buttonRef:SetPoint("RIGHT", "$parent", -]=]..SPELLFLYOUT_INITIAL_SPACING..[=[, 0)
+					end
+				elseif direction == "RIGHT" then
+					if prevButton then
+						buttonRef:SetPoint("LEFT", prevButton, "RIGHT", ]=]..SPELLFLYOUT_DEFAULT_SPACING..[=[, 0)
+					else
+						buttonRef:SetPoint("LEFT", "$parent", ]=]..SPELLFLYOUT_INITIAL_SPACING..[=[, 0)
+					end
+				end
+
+				buttonRef:SetAttribute("type", "spell")
+				buttonRef:SetAttribute("spell", spellList[i])
+				buttonRef:Show()
+
+				prevButton = buttonRef
+			else
+				buttonRef:Hide()
 			end
 		end
-		floFlyoutFrame.BgEnd:ClearAllPoints()
-		local distance = 3
-		if direction == "UP" then
-			floFlyoutFrame.BgEnd:SetPoint("TOP")
-			SetClampedTextureRotation(floFlyoutFrame.BgEnd, 0)
-			floFlyoutFrame.HorizBg:Hide()
-			floFlyoutFrame.VertBg:Show()
-			floFlyoutFrame.VertBg:ClearAllPoints()
-			floFlyoutFrame.VertBg:SetPoint("TOP", floFlyoutFrame.BgEnd, "BOTTOM")
-			floFlyoutFrame.VertBg:SetPoint("BOTTOM", 0, distance)
-		elseif direction == "DOWN" then
-			floFlyoutFrame.BgEnd:SetPoint("BOTTOM")
-			SetClampedTextureRotation(floFlyoutFrame.BgEnd, 180)
-			floFlyoutFrame.HorizBg:Hide()
-			floFlyoutFrame.VertBg:Show()
-			floFlyoutFrame.VertBg:ClearAllPoints()
-			floFlyoutFrame.VertBg:SetPoint("BOTTOM", self.BgEnd, "TOP")
-			floFlyoutFrame.VertBg:SetPoint("TOP", 0, -distance)
-		elseif direction == "LEFT" then
-			floFlyoutFrame.BgEnd:SetPoint("LEFT")
-			SetClampedTextureRotation(floFlyoutFrame.BgEnd, 270)
-			floFlyoutFrame.VertBg:Hide()
-			floFlyoutFrame.HorizBg:Show()
-			floFlyoutFrame.HorizBg:ClearAllPoints()
-			floFlyoutFrame.HorizBg:SetPoint("LEFT", floFlyoutFrame.BgEnd, "RIGHT")
-			floFlyoutFrame.HorizBg:SetPoint("RIGHT", -distance, 0)
-		elseif direction == "RIGHT" then
-			floFlyoutFrame.BgEnd:SetPoint("RIGHT")
-			SetClampedTextureRotation(floFlyoutFrame.BgEnd, 90)
-			floFlyoutFrame.VertBg:Hide()
-			floFlyoutFrame.HorizBg:Show()
-			floFlyoutFrame.HorizBg:ClearAllPoints()
-			floFlyoutFrame.HorizBg:SetPoint("RIGHT", floFlyoutFrame.BgEnd, "LEFT")
-			floFlyoutFrame.HorizBg:SetPoint("LEFT", distance, 0)
+		local numButtons = table.maxn(spellList)
+		if direction == "UP" or direction == "DOWN" then
+			ref:SetWidth(prevButton:GetWidth())
+			ref:SetHeight((prevButton:GetHeight()+]=]..SPELLFLYOUT_DEFAULT_SPACING..[=[) * numButtons - ]=]..SPELLFLYOUT_DEFAULT_SPACING..[=[ + ]=]..SPELLFLYOUT_INITIAL_SPACING..[=[ + ]=]..SPELLFLYOUT_FINAL_SPACING..[=[)
+		else
+			ref:SetHeight(prevButton:GetHeight())
+			ref:SetWidth((prevButton:GetWidth()+]=]..SPELLFLYOUT_DEFAULT_SPACING..[=[) * numButtons - ]=]..SPELLFLYOUT_DEFAULT_SPACING..[=[ + ]=]..SPELLFLYOUT_INITIAL_SPACING..[=[ + ]=]..SPELLFLYOUT_FINAL_SPACING..[=[)
 		end
-		floFlyoutFrame:SetBorderColor(0.7, 0.7, 0.7)
-	end)
+	end
+]=]
+
+function FloFlyout:CreateOpener(name, idFlyout, direction, actionButton, actionBarPage, bonusBar)
+
+	local opener = self.openers[name] or CreateFrame("Button", name, UIParent, "ActionButtonTemplate, SecureHandlerClickTemplate")
+	self.openers[name] = opener
+
+	opener:SetAllPoints(actionButton)
+	opener:SetFrameStrata("DIALOG")
+
+	opener:SetAttribute("flyoutDirection", direction)
+	opener:SetFrameRef("FloFlyoutFrame", FloFlyoutFrame)
+	opener:SetAttribute("spelllist", strjoin(",", unpack(self.config.flyouts[idFlyout].spells)))
+
+	opener:SetScript("Update", Opener_UpdateFlyout)
+	opener:SetScript("Enter", Opener_UpdateFlyout)
+	opener:SetScript("Leave", Opener_UpdateFlyout)
+
+	opener:SetScript("PreClick", Opener_PreClick)
+	opener:SetAttribute("_onclick", snippet_Opener_Click)
+	opener:RegisterForClicks("AnyUp")
 
 	local icon = _G[opener:GetName().."Icon"]
 	if self.config.flyouts[idFlyout].icon then
@@ -378,26 +422,6 @@ function FloFlyout:CreateOpener(name, idFlyout, direction, actionButton, actionB
 	elseif self.config.flyouts[idFlyout].spells[1] then
 		local texture = GetSpellTexture(self.config.flyouts[idFlyout].spells[1])
 		icon:SetTexture(texture)
-	end
-
-	local flyoutArrow = _G[opener:GetName().."FlyoutArrow"]
-	local arrowDistance = 2
-
-	-- Update arrow
-	flyoutArrow:Show()
-	flyoutArrow:ClearAllPoints()
-	if direction == "LEFT" then
-		flyoutArrow:SetPoint("LEFT", opener, "LEFT", -arrowDistance, 0)
-		SetClampedTextureRotation(flyoutArrow, 270)
-	elseif direction == "RIGHT" then
-		flyoutArrow:SetPoint("RIGHT", opener, "RIGHT", arrowDistance, 0)
-		SetClampedTextureRotation(flyoutArrow, 90)
-	elseif direction == "DOWN" then
-		flyoutArrow:SetPoint("BOTTOM", opener, "BOTTOM", 0, -arrowDistance)
-		SetClampedTextureRotation(flyoutArrow, 180)
-	else
-		flyoutArrow:SetPoint("TOP", opener, "TOP", 0, arrowDistance)
-		SetClampedTextureRotation(flyoutArrow, 0)
 	end
 
 	local stateCondition = ""

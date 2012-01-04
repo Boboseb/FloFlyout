@@ -116,6 +116,11 @@ function FloFlyout_OnEvent(self, event, arg1, ...)
 		-- Ici, nous avons rechargé notre configuration
 		FloFlyout.config = FLOFLYOUT_CONFIG
 
+		local button
+		for _, button in ipairs({FloFlyoutFrame:GetChildren()}) do
+			SecureHandlerWrapScript(button, "OnClick", button, "self:GetParent():Hide()")
+		end
+
 	elseif event == "UPDATE_BINDINGS" then
 
 	elseif event == "ACTIVE_TALENT_GROUP_CHANGED" then
@@ -328,12 +333,10 @@ local snippet_Opener_Click = [=[
 	local direction = self:GetAttribute("flyoutDirection")
 	local prevButton = nil;
 
-	if ref:IsShown() then
+	if ref:IsShown() and ref:GetParent() == self then
 		ref:Hide()
 	else
-		ref:Show()
-		ref:RegisterAutoHide(1)
-		ref:AddToAutoHide(self)
+		ref:SetParent(self)
 		ref:ClearAllPoints()
 		if direction == "UP" then
 			ref:SetPoint("BOTTOM", self, "TOP", 0, 0)
@@ -393,6 +396,9 @@ local snippet_Opener_Click = [=[
 			ref:SetHeight(prevButton:GetHeight())
 			ref:SetWidth((prevButton:GetWidth()+]=]..SPELLFLYOUT_DEFAULT_SPACING..[=[) * numButtons - ]=]..SPELLFLYOUT_DEFAULT_SPACING..[=[ + ]=]..SPELLFLYOUT_INITIAL_SPACING..[=[ + ]=]..SPELLFLYOUT_FINAL_SPACING..[=[)
 		end
+		ref:Show()
+		ref:RegisterAutoHide(1)
+		ref:AddToAutoHide(self)
 	end
 ]=]
 
@@ -408,9 +414,9 @@ function FloFlyout:CreateOpener(name, idFlyout, direction, actionButton, actionB
 	opener:SetFrameRef("FloFlyoutFrame", FloFlyoutFrame)
 	opener:SetAttribute("spelllist", strjoin(",", unpack(self.config.flyouts[idFlyout].spells)))
 
-	opener:SetScript("Update", Opener_UpdateFlyout)
-	opener:SetScript("Enter", Opener_UpdateFlyout)
-	opener:SetScript("Leave", Opener_UpdateFlyout)
+	opener:SetScript("OnUpdate", Opener_UpdateFlyout)
+	opener:SetScript("OnEnter", Opener_UpdateFlyout)
+	opener:SetScript("OnLeave", Opener_UpdateFlyout)
 
 	opener:SetScript("PreClick", Opener_PreClick)
 	opener:SetAttribute("_onclick", snippet_Opener_Click)

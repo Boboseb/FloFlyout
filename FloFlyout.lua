@@ -58,7 +58,7 @@ local function FloFlyout_ReadCmd(line)
 	elseif cmd == "removeflyout" and FloFlyout:IsValidFlyoutId(arg1) then
 		FloFlyout:RemoveFlyout(arg1)
 		FloFlyout:ApplyConfig()
-	elseif cmd == "addspell" and FloFlyout:IsValidFlyoutId(arg1) and tonumber(arg2) then
+	elseif cmd == "addspell" and FloFlyout:IsValidFlyoutId(arg1) then
 		DEFAULT_CHAT_FRAME:AddMessage("New spell : "..FloFlyout:AddSpell(arg1, arg2))
 		FloFlyout:ApplyConfig()
 	elseif cmd == "removespell" and FloFlyout:IsValidFlyoutId(arg1) and FloFlyout:IsValidSpellPos(arg1, arg2) then
@@ -490,10 +490,11 @@ function FloFlyout:RemoveFlyout(flyoutId)
 	end
 end
 
-function FloFlyout:AddSpell(flyoutId, spellId)
+function FloFlyout:AddSpell(flyoutId, spell)
+	local spellId
 	if type(flyoutId) == "string" then flyoutId = tonumber(flyoutId) end
-	if type(spellId) == "string" then spellId = tonumber(spellId) end
-	table.insert(self.config.flyouts[flyoutId].spells, spellId)
+	if type(spell) == "string" then spellId = tonumber(spell) end
+	table.insert(self.config.flyouts[flyoutId].spells, spellId or spell)
 	return #self.config.flyouts[flyoutId].spells
 end
 

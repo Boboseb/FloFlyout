@@ -147,7 +147,7 @@ function FloFlyoutFrame_OnEvent(self, event, ...)
 	if event == "SPELL_UPDATE_COOLDOWN" then
 		local i = 1
 		local button = _G[self:GetName().."Button"..i]
-		while (button and button:IsShown()) do
+		while (button and button:IsShown() and button.spellID) do
 			SpellFlyoutButton_UpdateCooldown(button)
 			i = i+1
 			button = _G[self:GetName().."Button"..i]
@@ -155,7 +155,7 @@ function FloFlyoutFrame_OnEvent(self, event, ...)
 	elseif event == "CURRENT_SPELL_CAST_CHANGED" then
 		local i = 1
 		local button = _G[self:GetName().."Button"..i]
-		while (button and button:IsShown()) do
+		while (button and button:IsShown() and button.spellID) do
 			SpellFlyoutButton_UpdateState(button)
 			i = i+1
 			button = _G[self:GetName().."Button"..i]
@@ -163,7 +163,7 @@ function FloFlyoutFrame_OnEvent(self, event, ...)
 	elseif event == "SPELL_UPDATE_USABLE" then
 		local i = 1
 		local button = _G[self:GetName().."Button"..i]
-		while (button and button:IsShown()) do
+		while (button and button:IsShown() and button.spellID) do
 			SpellFlyoutButton_UpdateUsable(button)
 			i = i+1
 			button = _G[self:GetName().."Button"..i]
@@ -171,7 +171,7 @@ function FloFlyoutFrame_OnEvent(self, event, ...)
 	elseif event == "BAG_UPDATE" then
 		local i = 1
 		local button = _G[self:GetName().."Button"..i]
-		while (button and button:IsShown()) do
+		while (button and button:IsShown() and button.spellID) do
 			SpellFlyoutButton_UpdateCount(button)
 			SpellFlyoutButton_UpdateUsable(button)
 			i = i+1
@@ -180,7 +180,7 @@ function FloFlyoutFrame_OnEvent(self, event, ...)
 	elseif event == "SPELL_FLYOUT_UPDATE" then
 		local i = 1
 		local button = _G[self:GetName().."Button"..i]
-		while (button and button:IsShown()) do
+		while (button and button:IsShown() and button.spellID) do
 			SpellFlyoutButton_UpdateCooldown(button)
 			SpellFlyoutButton_UpdateState(button)
 			SpellFlyoutButton_UpdateUsable(button)

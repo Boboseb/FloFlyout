@@ -19,18 +19,23 @@
 				_G[self:GetName().."Icon"]:SetTexCoord(4/64, 60/64, 4/64, 60/64)
 			</OnLoad>
 			<OnEnter>
-				SpellFlyoutButton_SetTooltip(self);
+				FloFlyoutButton_SetTooltip(self)
 			</OnEnter>
 			<OnLeave>
 				GameTooltip:Hide()
 			</OnLeave>
 			<OnDragStart>
+				-- TODO: Check parent is FloFlyoutConfigFlyoutFrame
 				if not self:GetParent().isActionBar or LOCK_ACTIONBAR ~= "1" or IsModifiedClick("PICKUPACTION") then
 					if self.spellID then
 						PickupSpell(spell.spellID)
 					end
 				end
 			</OnDragStart>
+			<OnDragReceive>
+				-- TODO: Check parent is FloFlyoutConfigFlyoutFrame
+				-- TODO: Do something
+			</OnDragReceive>
 			<PreClick>
 				self:SetChecked(not self:GetChecked());
 			</PreClick>
@@ -38,15 +43,15 @@
 		<NormalTexture/>
 	</CheckButton>
 
-	<Frame name="FloFlyoutFrame" frameStrata="DIALOG" frameLevel="10" parent="UIParent" hidden="true">
+	<Frame name="FloFlyoutFrameTemplate" frameStrata="DIALOG" frameLevel="10" parent="UIParent" hidden="true" virtual="TRUE">
 		<Layers>
 			<Layer level="BACKGROUND">
-				<Texture name="FloFlyoutBackgroundEnd" inherits="ActionBarFlyoutButton-FlyoutTop" parentKey="BgEnd"/>
-				<Texture name="FloFlyoutHorizontalBackground" file="Interface\Buttons\ActionBarFlyoutButton-FlyoutMidLeft" parentKey="HorizBg" horizTile="true" hidden="true">
+				<Texture name="$parentBackgroundEnd" inherits="ActionBarFlyoutButton-FlyoutTop" parentKey="BgEnd"/>
+				<Texture name="$parentHorizontalBackground" file="Interface\Buttons\ActionBarFlyoutButton-FlyoutMidLeft" parentKey="HorizBg" horizTile="true" hidden="true">
 					<Size x="32" y="37"/>
 					<TexCoords left="0" right="1" top="0" bottom="0.578125"/>
 				</Texture>
-				<Texture name="FloFlyoutVerticalBackground" file="Interface\Buttons\ActionBarFlyoutButton-FlyoutMid" parentKey="VertBg" vertTile="true" hidden="true">
+				<Texture name="$parentVerticalBackground" file="Interface\Buttons\ActionBarFlyoutButton-FlyoutMid" parentKey="VertBg" vertTile="true" hidden="true">
 					<Size x="37" y="32"/>
 					<TexCoords left="0" right="0.578125" top="0" bottom="1"/>
 				</Texture>
@@ -73,6 +78,12 @@
 			<OnHide function="SpellFlyout_OnHide"/>
 			<OnEvent function="FloFlyoutFrame_OnEvent"/>
 		</Scripts>
+	</Frame>
+
+	<Frame name="FloFlyoutFrame" inherits="FloFlyoutFrameTemplate" frameStrata="DIALOG" frameLevel="10" parent="UIParent" hidden="true">
+	</Frame>
+
+	<Frame name="FloFlyoutConfigFlyoutFrame" inherits="FloFlyoutFrameTemplate" frameStrata="DIALOG" frameLevel="10" parent="UIParent" hidden="true">
 	</Frame>
 
 	<Button name="FloFlyoutConfigButtonTemplate" virtual="true">
@@ -128,6 +139,17 @@
 					<TexCoords left="0.2" right="0.8" top="0" bottom="1"/>
 				</Texture>
 			</Layer>
+			<Layer level="OVERLAY" textureSubLevel="1">
+				<Texture name="$parentArrow" parentKey="Arrow" file="Interface\PaperDollInfoFrame\UI-GearManager-FlyoutButton" hidden="true">
+					<Size>
+						<AbsDimension x="38" y="16"/>
+					</Size>
+					<Anchors>
+						<Anchor point="RIGHT"/>
+					</Anchors>
+					<TexCoords left="0.15625" right="0.84375" top="0" bottom="0.5"/>
+				</Texture>
+			</Layer>
 		</Layers>
 		<Frames>
 			<Button name="$parentDeleteButton" parentKey="DeleteButton" hidden="true">
@@ -135,7 +157,7 @@
 					<AbsDimension x="14" y="14"/>
 				</Size>
 				<Anchors>
-					<Anchor point="BOTTOMRIGHT" x="-2" y="2"/>
+					<Anchor point="BOTTOMRIGHT" x="-18" y="2"/>
 				</Anchors>
 				<Layers>
 					<Layer level="ARTWORK">
@@ -212,6 +234,7 @@
 			<OnLoad>
 				self:RegisterForDrag("LeftButton");
 				SetClampedTextureRotation(self.BgBottom, 180);
+				SetClampedTextureRotation(self.Arrow, 90);
 			</OnLoad>
 			<OnClick>
 				FloFlyoutConfigButton_OnClick(self, button, down);
@@ -378,13 +401,6 @@
 				</Texture>
 			</Layer>
 			<Layer level="ARTWORK">
-				<!--<FontString inherits="GameFontHighlightSmall" text="GEARSETS_POPUP_TEXT" name="$parentNameText">
-					<Anchors>
-						<Anchor point="TOPLEFT">
-							<Offset x="24" y="-21"/>
-						</Anchor>
-					</Anchors>
-				</FontString>-->
 				<FontString inherits="GameFontHighlightSmall" text="MACRO_POPUP_CHOOSE_ICON" name="$parentChooseIconText">
 					<Anchors>
 						<Anchor point="TOPLEFT">

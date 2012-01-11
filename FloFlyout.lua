@@ -146,50 +146,48 @@ end
 function FloFlyoutFrame_OnEvent(self, event, ...)
 	if event == "SPELL_UPDATE_COOLDOWN" then
 		local i = 1
-		local button = _G["FloFlyoutFrameButton"..i]
+		local button = _G[self:GetName().."Button"..i]
 		while (button and button:IsShown()) do
 			SpellFlyoutButton_UpdateCooldown(button)
 			i = i+1
-			button = _G["FloFlyoutFrameButton"..i]
+			button = _G[self:GetName().."Button"..i]
 		end
 	elseif event == "CURRENT_SPELL_CAST_CHANGED" then
 		local i = 1
-		local button = _G["FloFlyoutFrameFlyoutButton"..i]
+		local button = _G[self:GetName().."Button"..i]
 		while (button and button:IsShown()) do
 			SpellFlyoutButton_UpdateState(button)
 			i = i+1
-			button = _G["FloFlyoutFrameButton"..i]
+			button = _G[self:GetName().."Button"..i]
 		end
 	elseif event == "SPELL_UPDATE_USABLE" then
 		local i = 1
-		local button = _G["FloFlyoutFrameFlyoutButton"..i]
+		local button = _G[self:GetName().."Button"..i]
 		while (button and button:IsShown()) do
 			SpellFlyoutButton_UpdateUsable(button)
 			i = i+1
-			button = _G["FloFlyoutFrameButton"..i]
+			button = _G[self:GetName().."Button"..i]
 		end
 	elseif event == "BAG_UPDATE" then
 		local i = 1
-		local button = _G["FloFlyoutFrameButton"..i]
+		local button = _G[self:GetName().."Button"..i]
 		while (button and button:IsShown()) do
 			SpellFlyoutButton_UpdateCount(button)
 			SpellFlyoutButton_UpdateUsable(button)
 			i = i+1
-			button = _G["FloFlyoutFrameButton"..i]
+			button = _G[self:GetName().."Button"..i]
 		end
 	elseif event == "SPELL_FLYOUT_UPDATE" then
 		local i = 1
-		local button = _G["FloFlyoutFrameButton"..i]
+		local button = _G[self:GetName().."Button"..i]
 		while (button and button:IsShown()) do
 			SpellFlyoutButton_UpdateCooldown(button)
 			SpellFlyoutButton_UpdateState(button)
 			SpellFlyoutButton_UpdateUsable(button)
 			SpellFlyoutButton_UpdateCount(button)
 			i = i+1
-			button = _G["FloFlyoutFrameButton"..i]
+			button = _G[self:GetName().."Button"..i]
 		end
-	elseif event == "ACTIONBAR_PAGE_CHANGED" then
-		self:Hide()
 	end
 end
 
@@ -528,6 +526,144 @@ function FloFlyout:RemoveAction(actionId)
 	self.config.actions[GetActiveTalentGroup()][actionId] = nil
 end
 
+function FloFlyoutButton_SetTooltip(self)
+	if self.spellID then
+		if type(self.spellID) == "number" then
+			SpellFlyoutButton_SetTooltip(self)
+		else
+			-- TODO: Check mount, items, etc
+		end
+	else
+		-- TODO: Set tooltip to "drag spell here"
+	end
+end
+
+function FloFlyoutConfigFlyoutFrame_Update(self, idFlyout)
+	local direction = "RIGHT"
+	local parent = self.parent
+
+	-- Update all spell buttons for this flyout
+	local prevButton = nil;
+	local numButtons = 0;
+	local spells = FloFlyout.config.flyouts[idFlyout].spells
+
+	for i=1, #spells+1 do
+		local spellID = spells[i]
+		local button = _G["FloFlyoutConfigFlyoutFrameButton"..numButtons+1]
+
+		button:ClearAllPoints()
+		if direction == "UP" then
+			if prevButton then
+				button:SetPoint("BOTTOM", prevButton, "TOP", 0, SPELLFLYOUT_DEFAULT_SPACING)
+			else
+				button:SetPoint("BOTTOM", 0, SPELLFLYOUT_INITIAL_SPACING)
+			end
+		elseif direction == "DOWN" then
+			if prevButton then
+				button:SetPoint("TOP", prevButton, "BOTTOM", 0, -SPELLFLYOUT_DEFAULT_SPACING)
+			else
+				button:SetPoint("TOP", 0, -SPELLFLYOUT_INITIAL_SPACING)
+			end
+		elseif direction == "LEFT" then
+			if prevButton then
+				button:SetPoint("RIGHT", prevButton, "LEFT", -SPELLFLYOUT_DEFAULT_SPACING, 0)
+			else
+				button:SetPoint("RIGHT", -SPELLFLYOUT_INITIAL_SPACING, 0)
+			end
+		elseif direction == "RIGHT" then
+			if prevButton then
+				button:SetPoint("LEFT", prevButton, "RIGHT", SPELLFLYOUT_DEFAULT_SPACING, 0)
+			else
+				button:SetPoint("LEFT", SPELLFLYOUT_INITIAL_SPACING, 0)
+			end
+		end
+
+		button:Show()
+
+		if spellID then
+			_G[button:GetName().."Icon"]:SetTexture(GetSpellTexture(spellID))
+			button.spellID = spellID
+			SpellFlyoutButton_UpdateCooldown(button)
+			SpellFlyoutButton_UpdateState(button)
+			SpellFlyoutButton_UpdateUsable(button)
+			SpellFlyoutButton_UpdateCount(button)
+		else
+			_G[button:GetName().."Icon"]:SetTexture(nil)
+			button.spellID = nil
+		end
+
+		prevButton = button
+		numButtons = numButtons+1
+	end
+
+	-- Hide unused buttons
+	local unusedButtonIndex = numButtons+1
+	while _G["FloFlyoutConfigFlyoutFrameButton"..unusedButtonIndex] do
+		_G["FloFlyoutConfigFlyoutFrameButton"..unusedButtonIndex]:Hide()
+		unusedButtonIndex = unusedButtonIndex+1
+	end
+	
+	if numButtons == 0 then
+		self:Hide()
+		return
+	end
+	
+	-- Show the flyout
+	self:SetFrameStrata("DIALOG")
+	self:ClearAllPoints()
+	
+	local distance = 3
+	
+	self.BgEnd:ClearAllPoints()
+	if direction == "UP" then
+		self:SetPoint("BOTTOM", parent, "TOP", 0, 0)
+		self.BgEnd:SetPoint("TOP")
+		SetClampedTextureRotation(self.BgEnd, 0)
+		self.HorizBg:Hide()
+		self.VertBg:Show()
+		self.VertBg:ClearAllPoints()
+		self.VertBg:SetPoint("TOP", self.BgEnd, "BOTTOM")
+		self.VertBg:SetPoint("BOTTOM", 0, distance)
+	elseif direction == "DOWN" then
+		self:SetPoint("TOP", parent, "BOTTOM", 0, 0)
+		self.BgEnd:SetPoint("BOTTOM")
+		SetClampedTextureRotation(self.BgEnd, 180)
+		self.HorizBg:Hide()
+		self.VertBg:Show()
+		self.VertBg:ClearAllPoints()
+		self.VertBg:SetPoint("BOTTOM", self.BgEnd, "TOP")
+		self.VertBg:SetPoint("TOP", 0, -distance)
+	elseif direction == "LEFT" then
+		self:SetPoint("RIGHT", parent, "LEFT", 0, 0)
+		self.BgEnd:SetPoint("LEFT")
+		SetClampedTextureRotation(self.BgEnd, 270)
+		self.VertBg:Hide()
+		self.HorizBg:Show()
+		self.HorizBg:ClearAllPoints()
+		self.HorizBg:SetPoint("LEFT", self.BgEnd, "RIGHT")
+		self.HorizBg:SetPoint("RIGHT", -distance, 0)
+	elseif direction == "RIGHT" then
+		self:SetPoint("LEFT", parent, "RIGHT", 26, 0)
+		self.BgEnd:SetPoint("RIGHT")
+		SetClampedTextureRotation(self.BgEnd, 90)
+		self.VertBg:Hide()
+		self.HorizBg:Show()
+		self.HorizBg:ClearAllPoints()
+		self.HorizBg:SetPoint("RIGHT", self.BgEnd, "LEFT")
+		self.HorizBg:SetPoint("LEFT", distance, 0)
+	end
+	
+	if direction == "UP" or direction == "DOWN" then
+		self:SetWidth(prevButton:GetWidth())
+		self:SetHeight((prevButton:GetHeight()+SPELLFLYOUT_DEFAULT_SPACING) * numButtons - SPELLFLYOUT_DEFAULT_SPACING + SPELLFLYOUT_INITIAL_SPACING + SPELLFLYOUT_FINAL_SPACING)
+	else
+		self:SetHeight(prevButton:GetHeight())
+		self:SetWidth((prevButton:GetWidth()+SPELLFLYOUT_DEFAULT_SPACING) * numButtons - SPELLFLYOUT_DEFAULT_SPACING + SPELLFLYOUT_INITIAL_SPACING + SPELLFLYOUT_FINAL_SPACING)
+	end
+
+	self:SetBorderColor(0.7, 0.7, 0)
+end
+
 function FloFlyoutConfigPane_OnLoad(self)
 	HybridScrollFrame_OnLoad(self)
 	self.update = FloFlyoutConfigPane_Update
@@ -543,6 +679,7 @@ end
 
 function FloFlyoutConfigPane_OnHide(self)
 	FloFlyoutConfigDialogPopup:Hide()
+	FloFlyoutConfigFlyoutFrame:Hide()
 end
 
 function FloFlyoutConfigPane_OnUpdate(self)
@@ -572,6 +709,7 @@ function FloFlyoutConfigPane_Update()
 	local scrollOffset = HybridScrollFrame_GetOffset(FloFlyoutConfigPane)
 	local buttons = FloFlyoutConfigPane.buttons
 	local selectedIdx = FloFlyoutConfigPane.selectedIdx
+	FloFlyoutConfigFlyoutFrame:Hide()
 	local name, texture, button, flyout
 	for i = 1, #buttons do
 		if i+scrollOffset <= numRows then
@@ -598,8 +736,13 @@ function FloFlyoutConfigPane_Update()
 							
 				if selectedIdx and (i+scrollOffset) == selectedIdx then
 					button.SelectedBar:Show()
+					button.Arrow:Show()
+					FloFlyoutConfigFlyoutFrame.parent = button
+					FloFlyoutConfigFlyoutFrame_Update(FloFlyoutConfigFlyoutFrame, i+scrollOffset)
+					FloFlyoutConfigFlyoutFrame:Show()
 				else
 					button.SelectedBar:Hide()
+					button.Arrow:Hide()
 				end
 				
 				button.icon:SetSize(36, 36)
@@ -613,6 +756,7 @@ function FloFlyoutConfigPane_Update()
 				button.icon:SetSize(30, 30)
 				button.icon:SetPoint("LEFT", 7, 0)
 				button.SelectedBar:Hide()
+				button.Arrow:Hide()
 			end
 			
 			if (i+scrollOffset) == 1 then

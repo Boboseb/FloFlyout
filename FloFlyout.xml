@@ -18,24 +18,13 @@
 				self.maxDisplayCount = 99
 				_G[self:GetName().."Icon"]:SetTexCoord(4/64, 60/64, 4/64, 60/64)
 			</OnLoad>
-			<OnEnter>
-				FloFlyoutButton_SetTooltip(self)
-			</OnEnter>
+			<OnEnter function="FloFlyoutButton_SetTooltip" />
 			<OnLeave>
 				GameTooltip:Hide()
 			</OnLeave>
-			<OnDragStart>
-				-- TODO: Check parent is FloFlyoutConfigFlyoutFrame
-				if not self:GetParent().isActionBar or LOCK_ACTIONBAR ~= "1" or IsModifiedClick("PICKUPACTION") then
-					if self.spellID then
-						PickupSpell(spell.spellID)
-					end
-				end
-			</OnDragStart>
-			<OnDragReceive>
-				-- TODO: Check parent is FloFlyoutConfigFlyoutFrame
-				-- TODO: Do something
-			</OnDragReceive>
+			<OnDragStart function="FloFlyoutButton_OnDragStart" />
+			<OnReceiveDrag function="FloFlyoutButton_OnReceiveDrag" />
+			<OnMouseUp function="FloFlyoutButton_OnReceiveDrag" />
 			<PreClick>
 				self:SetChecked(not self:GetChecked());
 			</PreClick>

@@ -15,9 +15,15 @@ local STRIPE_COLOR = {r=0.9, g=0.9, b=1}
 
 FLOFLYOUT_CONFIG = {
 	flyouts = {
-		--[[ Sample config : each flyout can have a list of spell and an icon
+		--[[ Sample config : each flyout can have a list of actions and an icon
 		[1] = {
-			spells = {
+			actions = {
+				[1] = "spell",
+				[2] = "item",
+				[3] = "macro",
+				[4] = "pet"
+			},
+			spells,
 				[1] = 8024, -- Flametongue
 				[2] = 8033, -- Frostbite
 				[3] = 8232, -- Windfury
@@ -111,8 +117,6 @@ function FloFlyout_OnLoad(self)
 
 	self:RegisterEvent("PLAYER_ENTERING_WORLD")
 	self:RegisterEvent("PLAYER_ALIVE")
-	--self:RegisterEvent("SPELL_UPDATE_COOLDOWN")
-	--self:RegisterEvent("ACTIONBAR_UPDATE_USABLE")
 	self:RegisterEvent("UPDATE_BINDINGS")
 
 end
@@ -126,12 +130,25 @@ function FloFlyout_OnEvent(self, event, arg1, ...)
 
 	elseif event == "ADDON_LOADED" and arg1 == NAME then
 
+		self:UnregisterEvent("ADDON_LOADED")
 		-- Ici, nous avons rechargé notre configuration
 		FloFlyout.config = FLOFLYOUT_CONFIG
 
 		local button
 		for _, button in ipairs({FloFlyoutFrame:GetChildren()}) do
 			SecureHandlerWrapScript(button, "OnClick", button, "self:GetParent():Hide()")
+		end
+
+		FloFlyoutConfigFlyoutFrame.IsConfig = true
+		
+		local i, flyout
+		for _, flyout in ipairs(FloFlyout.config.flyouts) do
+			if flyout.actionTypes == nil then
+				flyout.actionTypes = {}
+				for i, _ in ipairs(flyout.spells) do
+					flyout.actionTypes[i] = "spell"
+				end
+			end
 		end
 
 	elseif event == "UPDATE_BINDINGS" then
@@ -188,6 +205,23 @@ function FloFlyoutFrame_OnEvent(self, event, ...)
 			i = i+1
 			button = _G[self:GetName().."Button"..i]
 		end
+	end
+end
+
+function FloFlyout:GetTexture(actionType, data)
+	if actionType == "spell" then
+		return GetSpellTexture(data)
+	elseif actionType == "item" then
+		return GetItemIcon(data)
+	end
+end
+
+function FloFlyout:GetName(actionType, data)
+	if actionType == "spell" then
+		return GetSpellInfo(data)
+	elseif actionType == "item" then
+		return GetItemInfo(data)
+	elseif actionType == "macro" then
 	end
 end
 
@@ -289,11 +323,13 @@ end
 local function Opener_PreClick(self, button, down)
 	local direction = self:GetAttribute("flyoutDirection");
 	local spellList = { strsplit(",", self:GetAttribute("spelllist")) }
+	local typeList = { strsplit(",", self:GetAttribute("typelist")) }
 	local buttonList = { FloFlyoutFrame:GetChildren() }
 	for i, buttonRef in ipairs(buttonList) do
 		if spellList[i] then
 			buttonRef.spellID = spellList[i]
-			local icon = GetSpellTexture(spellList[i])
+			buttonRef.actionType = typeList[i]
+			local icon = FloFlyout:GetTexture(typeList[i], spellList[i])
 			_G[buttonRef:GetName().."Icon"]:SetTexture(icon)
 			SpellFlyoutButton_UpdateCooldown(buttonRef)
 			SpellFlyoutButton_UpdateState(buttonRef)
@@ -359,7 +395,8 @@ local snippet_Opener_Click = [=[
 			ref:SetPoint("LEFT", self, "RIGHT", 0, 0)
 		end
 
-		local spellList = table.new(strsplit(",", self:GetAttribute("spelllist")))
+		local spellList = table.new(strsplit(",", self:GetAttribute("spellnamelist")))
+		local typeList = table.new(strsplit(",", self:GetAttribute("typelist")))
 		local buttonList = table.new(ref:GetChildren())
 		for i, buttonRef in ipairs(buttonList) do
 			if spellList[i] then
@@ -390,7 +427,7 @@ local snippet_Opener_Click = [=[
 					end
 				end
 
-				buttonRef:SetAttribute("type", "spell")
+				buttonRef:SetAttribute("type", typeList[i])
 				buttonRef:SetAttribute("spell", spellList[i])
 				buttonRef:Show()
 
@@ -415,6 +452,7 @@ local snippet_Opener_Click = [=[
 
 function FloFlyout:CreateOpener(name, idFlyout, direction, actionButton, actionBarPage, bonusBar)
 
+	local flyoutConf = self.config.flyouts[idFlyout]
 	local opener = self.openers[name] or CreateFrame("Button", name, UIParent, "ActionButtonTemplate, SecureHandlerClickTemplate")
 	self.openers[name] = opener
 
@@ -423,7 +461,13 @@ function FloFlyout:CreateOpener(name, idFlyout, direction, actionButton, actionB
 
 	opener:SetAttribute("flyoutDirection", direction)
 	opener:SetFrameRef("FloFlyoutFrame", FloFlyoutFrame)
-	opener:SetAttribute("spelllist", strjoin(",", unpack(self.config.flyouts[idFlyout].spells)))
+	opener:SetAttribute("spelllist", strjoin(",", unpack(flyoutConf.spells)))
+	local spellnameList = {}, i, spellID
+	for i, spellID in ipairs(flyoutConf.spells) do
+		spellnameList[i] = self:GetName(flyoutConf.actionTypes[i], spellID)
+	end
+	opener:SetAttribute("spellnamelist", strjoin(",", unpack(spellnameList)))
+	opener:SetAttribute("typelist", strjoin(",", unpack(flyoutConf.actionTypes)))
 
 	opener:SetScript("OnUpdate", Opener_UpdateFlyout)
 	opener:SetScript("OnEnter", Opener_UpdateFlyout)
@@ -434,10 +478,10 @@ function FloFlyout:CreateOpener(name, idFlyout, direction, actionButton, actionB
 	opener:RegisterForClicks("AnyUp")
 
 	local icon = _G[opener:GetName().."Icon"]
-	if self.config.flyouts[idFlyout].icon then
-		icon:SetTexture(self.config.flyouts[idFlyout].icon)
-	elseif self.config.flyouts[idFlyout].spells[1] then
-		local texture = GetSpellTexture(self.config.flyouts[idFlyout].spells[1])
+	if flyoutConf.icon then
+		icon:SetTexture(flyoutConf.icon)
+	elseif flyoutConf.spells[1] then
+		local texture = FloFlyout:GetTexture(flyoutConf.actionTypes[1], flyoutConf.spells[1])
 		icon:SetTexture(texture)
 	end
 
@@ -481,7 +525,7 @@ function FloFlyout:IsValidSpellPos(flyoutId, arg2)
 end
 
 function FloFlyout:AddFlyout()
-	table.insert(self.config.flyouts, { spells = {} })
+	table.insert(self.config.flyouts, { spells = {}, actionTypes = {} })
 	return #self.config.flyouts
 end
 
@@ -501,18 +545,22 @@ function FloFlyout:RemoveFlyout(flyoutId)
 	end
 end
 
-function FloFlyout:AddSpell(flyoutId, spell)
-	local spellId
+function FloFlyout:AddSpell(flyoutId, actionType, spellId)
 	if type(flyoutId) == "string" then flyoutId = tonumber(flyoutId) end
-	if type(spell) == "string" then spellId = tonumber(spell) end
-	table.insert(self.config.flyouts[flyoutId].spells, spellId or spell)
-	return #self.config.flyouts[flyoutId].spells
+	if type(spellId) == "string" then spellId = tonumber(spell) end
+	local flyoutConf = self.config.flyouts[flyoutId]
+	table.insert(flyoutConf.spells, spellId)
+	local newPos = #flyoutConf.spells
+	flyoutConf.actionTypes[newPos] = actionType
+	return newPos
 end
 
 function FloFlyout:RemoveSpell(flyoutId, spellPos)
 	if type(flyoutId) == "string" then flyoutId = tonumber(flyoutId) end
 	if type(spellPos) == "string" then spellPos = tonumber(spellPos) end
-	table.remove(self.config.flyouts[flyoutId].spells, spellPos)
+	local flyoutConf = self.config.flyouts[flyoutId]
+	table.remove(flyoutConf.spells, spellPos)
+	table.remove(flyoutConf.actionTypes, spellPos)
 end
 
 function FloFlyout:AddAction(actionId, flyoutId)
@@ -527,14 +575,55 @@ function FloFlyout:RemoveAction(actionId)
 end
 
 function FloFlyoutButton_SetTooltip(self)
-	if self.spellID then
-		if type(self.spellID) == "number" then
-			SpellFlyoutButton_SetTooltip(self)
-		else
-			-- TODO: Check mount, items, etc
+	if self.actionType == "spell" then
+		SpellFlyoutButton_SetTooltip(self)
+	elseif sel.actionType == "item" then
+		
+	end
+end
+
+function FloFlyoutButton_OnDragStart(self)
+	if InCombatLockdown() then return end
+
+	local spell = self.spellID
+	if spell then
+		PickupSpell(spell);
+	end
+
+	local parent = self:GetParent()
+	if parent.IsConfig then
+		FloFlyout:RemoveSpell(parent.idFlyout, self:GetID())
+		FloFlyout:ApplyConfig()
+		FloFlyoutConfigFlyoutFrame_Update(parent, parent.idFlyout)
+	end
+end
+
+function FloFlyoutButton_OnReceiveDrag(self)
+	local parent = self:GetParent()
+	if not parent.IsConfig then return end
+
+	local kind, info1, info2, info3 = GetCursorInfo()
+	local actionType, actionData
+	if kind == "spell" then
+		actionType = "spell"
+		actionData = info3
+	elseif kind == "companion" then
+		local creatureID, creatureName, spellID, icon, active = GetCompanionInfo(info2, info1);
+		actionType = "spell"
+		actionData = spellID
+	end
+	if actionType then
+		local flyoutConf = FloFlyout.config.flyouts[parent.idFlyout]
+		local oldActionData = flyoutConf.spells[self:GetID()]
+		local oldActionType = flyoutConf.actionTypes[self:GetID()]
+		flyoutConf.spells[self:GetID()] = actionData
+		flyoutConf.actionTypes[self:GetID()] = actionType
+		ClearCursor()
+		FloFlyout:ApplyConfig()
+		FloFlyoutConfigFlyoutFrame_Update(parent, parent.idFlyout)
+		if oldSpell then
+			PickupSpell(oldSpell)
 		end
-	else
-		-- TODO: Set tooltip to "drag spell here"
 	end
 end
 
@@ -542,13 +631,17 @@ function FloFlyoutConfigFlyoutFrame_Update(self, idFlyout)
 	local direction = "RIGHT"
 	local parent = self.parent
 
+	self.idFlyout = idFlyout
+
 	-- Update all spell buttons for this flyout
 	local prevButton = nil;
 	local numButtons = 0;
 	local spells = FloFlyout.config.flyouts[idFlyout].spells
+	local actionTypes = FloFlyout.config.flyouts[idFlyout].actionTypes
 
 	for i=1, #spells+1 do
 		local spellID = spells[i]
+		local actionType = actionTypes[i]
 		local button = _G["FloFlyoutConfigFlyoutFrameButton"..numButtons+1]
 
 		button:ClearAllPoints()
@@ -581,8 +674,10 @@ function FloFlyoutConfigFlyoutFrame_Update(self, idFlyout)
 		button:Show()
 
 		if spellID then
-			_G[button:GetName().."Icon"]:SetTexture(GetSpellTexture(spellID))
 			button.spellID = spellID
+			button.actionType = actionType
+			local texture = FloFlyout:GetTexture(actionType, spellID)
+			_G[button:GetName().."Icon"]:SetTexture(texture)
 			SpellFlyoutButton_UpdateCooldown(button)
 			SpellFlyoutButton_UpdateState(button)
 			SpellFlyoutButton_UpdateUsable(button)
@@ -726,7 +821,7 @@ function FloFlyoutConfigPane_Update()
 				texture = flyout.icon
 
 				if not texture and flyout.spells[1] then
-					texture = GetSpellTexture(flyout.spells[1])
+					texture = FloFlyout:GetTexture(flyout.actionTypes[1], flyout.spells[1])
 				end
 				if texture then
 					button.icon:SetTexture(texture)
@@ -907,7 +1002,7 @@ end
 --[[
 RefreshFlyoutIconInfo() counts how many uniquely textured spells the player has in the current flyout. 
 ]]
-function RefreshFlyoutIconInfo ()
+function RefreshFlyoutIconInfo()
 	FC_ICON_FILENAMES = {}
 	FC_ICON_FILENAMES[1] = "INV_MISC_QUESTIONMARK"
 	local index = 2
@@ -916,8 +1011,9 @@ function RefreshFlyoutIconInfo ()
 	if popup.name then
 		local i
 		local spells = FloFlyout.config.flyouts[popup.name].spells
+		local actionTypes = FloFlyout.config.flyouts[popup.name].actionTypes
 		for i = 1, #spells do
-			local itemTexture = GetSpellTexture(spells[i])
+			local itemTexture = FloFlyout:GetTexture(actionTypes[i], spells[i])
 			if itemTexture then
 				FC_ICON_FILENAMES[index] = gsub( strupper(itemTexture), "INTERFACE\\ICONS\\", "" )
 				if FC_ICON_FILENAMES[index] then

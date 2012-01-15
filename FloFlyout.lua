@@ -428,7 +428,7 @@ local snippet_Opener_Click = [=[
 				end
 
 				buttonRef:SetAttribute("type", typeList[i])
-				buttonRef:SetAttribute("spell", spellList[i])
+				buttonRef:SetAttribute(typeList[i], spellList[i])
 				buttonRef:Show()
 
 				prevButton = buttonRef
@@ -577,7 +577,7 @@ end
 function FloFlyoutButton_SetTooltip(self)
 	if self.actionType == "spell" then
 		SpellFlyoutButton_SetTooltip(self)
-	elseif sel.actionType == "item" then
+	elseif self.actionType == "item" then
 		
 	end
 end
@@ -585,9 +585,12 @@ end
 function FloFlyoutButton_OnDragStart(self)
 	if InCombatLockdown() then return end
 
+	local actionType = self.actionType
 	local spell = self.spellID
-	if spell then
-		PickupSpell(spell);
+	if actionType == "spell" then
+		PickupSpell(spell)
+	elseif actionType == "item" then
+		PickupItem(spell)
 	end
 
 	local parent = self:GetParent()
@@ -608,9 +611,11 @@ function FloFlyoutButton_OnReceiveDrag(self)
 		actionType = "spell"
 		actionData = info3
 	elseif kind == "companion" then
-		local creatureID, creatureName, spellID, icon, active = GetCompanionInfo(info2, info1);
 		actionType = "spell"
-		actionData = spellID
+		_, _, actionData, _, _ = GetCompanionInfo(info2, info1);
+	elseif kind == "item" then
+		actionType = "item"
+		actionData = info1
 	end
 	if actionType then
 		local flyoutConf = FloFlyout.config.flyouts[parent.idFlyout]
@@ -621,8 +626,10 @@ function FloFlyoutButton_OnReceiveDrag(self)
 		ClearCursor()
 		FloFlyout:ApplyConfig()
 		FloFlyoutConfigFlyoutFrame_Update(parent, parent.idFlyout)
-		if oldSpell then
-			PickupSpell(oldSpell)
+		if oldActionType == "spell" then
+			PickupSpell(oldActionData)
+		elseif oldActionType == "item" then
+			PickupItem(oldActionData)
 		end
 	end
 end
@@ -685,6 +692,7 @@ function FloFlyoutConfigFlyoutFrame_Update(self, idFlyout)
 		else
 			_G[button:GetName().."Icon"]:SetTexture(nil)
 			button.spellID = nil
+			button.actionType = nil
 		end
 
 		prevButton = button

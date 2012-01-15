@@ -445,8 +445,8 @@ local snippet_Opener_Click = [=[
 			ref:SetWidth((prevButton:GetWidth()+]=]..SPELLFLYOUT_DEFAULT_SPACING..[=[) * numButtons - ]=]..SPELLFLYOUT_DEFAULT_SPACING..[=[ + ]=]..SPELLFLYOUT_INITIAL_SPACING..[=[ + ]=]..SPELLFLYOUT_FINAL_SPACING..[=[)
 		end
 		ref:Show()
-		ref:RegisterAutoHide(1)
-		ref:AddToAutoHide(self)
+		--ref:RegisterAutoHide(1)
+		--ref:AddToAutoHide(self)
 	end
 ]=]
 
@@ -575,10 +575,30 @@ function FloFlyout:RemoveAction(actionId)
 end
 
 function FloFlyoutButton_SetTooltip(self)
-	if self.actionType == "spell" then
-		SpellFlyoutButton_SetTooltip(self)
-	elseif self.actionType == "item" then
-		
+	if GetCVar("UberTooltips") == "1" then
+		GameTooltip_SetDefaultAnchor(GameTooltip, self)
+
+		local setTooltip
+		if self.actionType == "spell" then
+			setTooltip = GameTooltip.SetSpellByID
+		elseif self.actionType == "item" then
+			setTooltip = GameTooltip.SetItemByID
+		end
+		if setTooltip and setTooltip(GameTooltip, self.spellID) then
+			self.UpdateTooltip = FloFlyoutButton_SetTooltip
+		else
+			self.UpdateTooltip = nil
+		end
+	else
+		local parent = self:GetParent():GetParent():GetParent():GetParent()
+		if parent == MultiBarBottomRight or parent == MultiBarRight or parent == MultiBarLeft then
+			GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+		else
+			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		end
+		local spellName = FloFlyout:GetName(self.actionType, self.spellID)
+		GameTooltip:SetText(spellName, HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b)
+		self.UpdateTooltip = nil
 	end
 end
 

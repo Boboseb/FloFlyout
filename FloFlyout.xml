@@ -225,11 +225,8 @@
 				SetClampedTextureRotation(self.BgBottom, 180);
 				SetClampedTextureRotation(self.Arrow, 90);
 			</OnLoad>
-			<OnClick>
-				FloFlyoutConfigButton_OnClick(self, button, down);
-			</OnClick>
-			<OnDragStart>
-			</OnDragStart>
+			<OnClick function="FloFlyoutConfigButton_OnClick" />
+			<OnDragStart function="FloFlyoutConfigButton_OnDragStart" />
 		</Scripts>
 		<NormalTexture name="$parentIcon" parentKey="icon">
 			<Size>

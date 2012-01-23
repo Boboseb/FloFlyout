@@ -118,6 +118,7 @@ function FloFlyout_OnLoad(self)
 	self:RegisterEvent("PLAYER_ENTERING_WORLD")
 	self:RegisterEvent("PLAYER_ALIVE")
 	self:RegisterEvent("UPDATE_BINDINGS")
+	self:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
 
 end
 
@@ -149,6 +150,36 @@ function FloFlyout_OnEvent(self, event, arg1, ...)
 					flyout.actionTypes[i] = "spell"
 				end
 			end
+		end
+
+	elseif event == "ACTIONBAR_SLOT_CHANGED" then
+		local idAction = arg1
+		-- Dans tous les cas, si nous avions un flyout sur cette action, il faut l'enlever de l'action et le mettre dans le curseur
+		local configChanged
+		local oldFlyoutId = FloFlyout.config.actions[GetActiveTalentGroup()][idAction]
+
+		local actionType, id, subType = GetActionInfo(idAction)
+		-- Si actionType vide, c'est sans doute que l'on vient de détruire la macro bidon
+		if not actionType then
+			return
+		elseif actionType == "macro" then
+			local name, texture, body = GetMacroInfo(id)
+			if name == "__ffodnd" then
+				FloFlyout:AddAction(idAction, body)
+				-- La pseudo macro a fait son travail
+				DeleteMacro("__ffodnd")
+				configChanged = true
+			end
+		end
+		if oldFlyoutId then
+			FloFlyout:PickupFlyout(oldFlyoutId)
+			if not configChanged then
+				FloFlyout:RemoveAction(idAction)
+				configChanged = true
+			end
+		end
+		if configChanged then
+			FloFlyout:ApplyConfig()
 		end
 
 	elseif event == "UPDATE_BINDINGS" then
@@ -285,7 +316,26 @@ function FloFlyout:BindFlyoutToAction(idFlyout, idAction)
 		actionButton = _G["ActionButton"..(idAction - 108)]
 	end
 
-	FloFlyout:CreateOpener("FloFlyoutOpener"..idAction, idFlyout, direction, actionButton, actionBarPage, bonusBar)
+	FloFlyout:CreateOpener("FloFlyoutOpener"..idAction, idFlyout, idAction, direction, actionButton, actionBarPage, bonusBar)
+end
+
+local function Opener_OnReceiveDrag(self)
+	if InCombatLockdown() then
+		return
+	end
+
+	local cursor = GetCursorInfo()
+	if cursor then
+		PlaceAction(self.actionId)
+	end
+end
+
+local function Opener_OnDragStart(self)
+	if not InCombatLockdown() and (LOCK_ACTIONBAR ~= "1" or IsShiftKeyDown()) then
+		FloFlyout:PickupFlyout(self.flyoutId)
+		FloFlyout:RemoveAction(self.actionId)
+		FloFlyout:ApplyConfig()
+	end
 end
 
 local function Opener_UpdateFlyout(self)
@@ -450,11 +500,13 @@ local snippet_Opener_Click = [=[
 	end
 ]=]
 
-function FloFlyout:CreateOpener(name, idFlyout, direction, actionButton, actionBarPage, bonusBar)
+function FloFlyout:CreateOpener(name, idFlyout, actionId, direction, actionButton, actionBarPage, bonusBar)
 
 	local flyoutConf = self.config.flyouts[idFlyout]
 	local opener = self.openers[name] or CreateFrame("Button", name, UIParent, "ActionButtonTemplate, SecureHandlerClickTemplate")
 	self.openers[name] = opener
+	opener.flyoutId = idFlyout
+	opener.actionId = actionId
 
 	opener:SetAllPoints(actionButton)
 	opener:SetFrameStrata("DIALOG")
@@ -473,9 +525,14 @@ function FloFlyout:CreateOpener(name, idFlyout, direction, actionButton, actionB
 	opener:SetScript("OnEnter", Opener_UpdateFlyout)
 	opener:SetScript("OnLeave", Opener_UpdateFlyout)
 
+	opener:SetScript("OnReceiveDrag", Opener_OnReceiveDrag)
+	opener:SetScript("OnMouseUp", Opener_OnReceiveDrag)
+	opener:SetScript("OnDragStart", Opener_OnDragStart)
+
 	opener:SetScript("PreClick", Opener_PreClick)
 	opener:SetAttribute("_onclick", snippet_Opener_Click)
 	opener:RegisterForClicks("AnyUp")
+	opener:RegisterForDrag("LeftButton")
 
 	local icon = _G[opener:GetName().."Icon"]
 	if flyoutConf.icon then
@@ -572,6 +629,28 @@ end
 function FloFlyout:RemoveAction(actionId)
 	if type(actionId) == "string" then actionId = tonumber(actionId) end
 	self.config.actions[GetActiveTalentGroup()][actionId] = nil
+end
+
+function FloFlyout:PickupFlyout(flyoutId)
+	-- No drag 'n drop in combat, I use protected API
+	if InCombatLockdown() then
+		return;
+	end
+
+	local flyoutConf = self.config.flyouts[flyoutId]
+	local texture = flyoutConf.icon
+
+	if not texture and flyoutConf.spells[1] then
+		texture = FloFlyout:GetTexture(flyoutConf.actionTypes[1], flyoutConf.spells[1])
+	end
+	if not texture then
+		texture = "Interface\\Icons\\INV_Misc_QuestionMark"
+	end
+	texture = string.sub(texture, string.len("INTERFACE\\ICONS\\") + 1)
+	-- Recreate dummy macro
+	DeleteMacro("__ffodnd")
+	local macroId = CreateMacro("__ffodnd", texture, flyoutId, nil, nil)
+	PickupMacro(macroId)
 end
 
 function FloFlyoutButton_SetTooltip(self)
@@ -923,6 +1002,12 @@ function FloFlyoutConfigButton_OnClick(self, button, down)
 		FloFlyoutConfigDialogPopup:Show()
 		FloFlyoutConfigPane.selectedIdx = nil
 		FloFlyoutConfigPane_Update()
+	end
+end
+
+function FloFlyoutConfigButton_OnDragStart(self)
+	if self.name and self.name ~= "" then
+		FloFlyout:PickupFlyout(self.name)
 	end
 end
 

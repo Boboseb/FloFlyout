@@ -269,7 +269,29 @@
 		<CheckedTexture alphaMode="ADD" file="Interface\Buttons\CheckButtonHilight"/>
 	</CheckButton>
 
-	<Frame name="FloFlyoutConfig" parent="SpellBookFrame" frameSrtata="DIALOG" inherits="TranslucentFrameTemplate">
+	<Button name="FloFlyoutOpenConfig" parent="SpellBookFrame" inherits="UIPanelButtonTemplate" text="FloFlyout">
+		<Size x="80" y="22"/>
+		<Anchors>
+			<Anchor point="RIGHT" relativePoint="LEFT" relativeTo="SpellBookFrameCloseButton" x="4" y="1" />
+		</Anchors>
+		<Scripts>
+			<OnClick>
+				if FloFlyoutConfig:IsShown() then
+					-- Hide FlyoutConfig panel and collapse its space
+					FloFlyoutConfig:Hide()
+					SetUIPanelAttribute(SpellBookFrame, "width", GetUIPanelWidth(SpellBookFrame) - 150)
+					UpdateUIPanelPositions(SpellBookFrame)
+				else
+					-- Show FlyoutConfig panel and make room for it
+					FloFlyoutConfig:Show()
+					SetUIPanelAttribute(SpellBookFrame, "width", GetUIPanelWidth(SpellBookFrame) + 150)
+					UpdateUIPanelPositions(SpellBookFrame)
+				end
+			</OnClick>
+		</Scripts>
+	</Button>
+
+	<Frame name="FloFlyoutConfig" parent="SpellBookFrame" frameStrata="MEDIUM" inherits="TranslucentFrameTemplate" hidden="true">
 		<Size>
 			<AbsDimension x="150" y="525"/>
 		</Size>
@@ -313,12 +335,6 @@
 				</Scripts>
 			</ScrollFrame>
 		</Frames>
- 		<Scripts>
- 			<!--<OnLoad function="PaperDollFrame_OnLoad"/>
-			<OnEvent function="PaperDollFrame_OnEvent"/>
-			<OnShow function="PaperDollFrame_OnShow"/>
-			<OnHide function="PaperDollFrame_OnHide"/>-->
-		</Scripts>
 	</Frame>
 
 	<Frame name="FloFlyoutConfigDialogPopup" hidden="true" parent="FloFlyoutConfig">

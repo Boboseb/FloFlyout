@@ -869,12 +869,10 @@ end
 function FloFlyoutConfigPane_OnLoad(self)
 	HybridScrollFrame_OnLoad(self)
 	self.update = FloFlyoutConfigPane_Update
-	DEFAULT_CHAT_FRAME:AddMessage( self:GetName().." "..self:GetHeight() )
 	HybridScrollFrame_CreateButtons(self, "FloFlyoutConfigButtonTemplate")
 end
 
 function FloFlyoutConfigPane_OnShow(self)
-	DEFAULT_CHAT_FRAME:AddMessage( self:GetName().." "..self:GetHeight() )
 	HybridScrollFrame_CreateButtons(self, "FloFlyoutConfigButtonTemplate")
 	FloFlyoutConfigPane_Update()
 end

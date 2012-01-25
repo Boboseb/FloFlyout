@@ -62,7 +62,7 @@ local L = FLOFLYOUT_L10N_STRINGS
 -- Functions
 -------------------------------------------------------------------------------
 
-local function FloFlyout.ReadCmd(line)
+function FloFlyout.ReadCmd(line)
 	local i, v, flyoutid;
 	local cmd, arg1, arg2 = strsplit(' ', line or "", 3);
 

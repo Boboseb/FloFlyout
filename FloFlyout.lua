@@ -56,7 +56,7 @@ local FloFlyout = {
 -- Functions
 -------------------------------------------------------------------------------
 
-local function FloFlyout_ReadCmd(line)
+local function FloFlyout.ReadCmd(line)
 	local i, v, flyoutid;
 	local cmd, arg1, arg2 = strsplit(' ', line or "", 3);
 
@@ -97,13 +97,13 @@ function FloFlyout_OnLoad(self)
 
 	SLASH_FLOFLYOUT1 = "/floflyout"
 	SLASH_FLOFLYOUT2 = "/ffo"
-	SlashCmdList["FLOFLYOUT"] = FloFlyout_ReadCmd
+	SlashCmdList["FLOFLYOUT"] = FloFlyout.ReadCmd
 
 	StaticPopupDialogs["CONFIRM_DELETE_FLO_FLYOUT"] = {
 		text = CONFIRM_DELETE_EQUIPMENT_SET,
 		button1 = YES,
 		button2 = NO,
-		OnAccept = function (self) FloFlyout:RemoveFlyout(self.data); FloFlyoutConfigPane_Update(); FloFlyout:ApplyConfig(); end,
+		OnAccept = function (self) FloFlyout:RemoveFlyout(self.data); FloFlyout.ConfigPane_Update(); FloFlyout:ApplyConfig(); end,
 		OnCancel = function (self) end,
 		hideOnEscape = 1,
 		timeout = 0,
@@ -868,13 +868,13 @@ end
 
 function FloFlyoutConfigPane_OnLoad(self)
 	HybridScrollFrame_OnLoad(self)
-	self.update = FloFlyoutConfigPane_Update
+	self.update = FloFlyout.ConfigPane_Update
 	HybridScrollFrame_CreateButtons(self, "FloFlyoutConfigButtonTemplate")
 end
 
 function FloFlyoutConfigPane_OnShow(self)
 	HybridScrollFrame_CreateButtons(self, "FloFlyoutConfigButtonTemplate")
-	FloFlyoutConfigPane_Update()
+	FloFlyout.ConfigPane_Update()
 end
 
 function FloFlyoutConfigPane_OnHide(self)
@@ -902,7 +902,7 @@ function FloFlyoutConfigPane_OnUpdate(self)
 	end
 end
 
-function FloFlyoutConfigPane_Update()
+function FloFlyout.ConfigPane_Update()
 	local numRows = #FloFlyout.config.flyouts + 1
 	HybridScrollFrame_Update(FloFlyoutConfigPane, numRows * EQUIPMENTSET_BUTTON_HEIGHT + 20, FloFlyoutConfigPane:GetHeight())
 	
@@ -993,13 +993,13 @@ function FloFlyoutConfigButton_OnClick(self, button, down)
 	if self.name and self.name ~= "" then
 		PlaySound("igMainMenuOptionCheckBoxOn")		-- inappropriately named, but a good sound.
 		FloFlyoutConfigPane.selectedIdx = self.name
-		FloFlyoutConfigPane_Update()
+		FloFlyout.ConfigPane_Update()
 		FloFlyoutConfigDialogPopup:Hide()
 	else
 		-- This is the "New" button
 		FloFlyoutConfigDialogPopup:Show()
 		FloFlyoutConfigPane.selectedIdx = nil
-		FloFlyoutConfigPane_Update()
+		FloFlyout.ConfigPane_Update()
 	end
 end
 
@@ -1081,13 +1081,13 @@ function RecalculateFloFlyoutConfigDialogPopup(iconTexture)
 	To do this, we need to find the current set (by icon) and move the offset of the FloFlyoutConfigDialogPopup
 	to display it. Issue ID: 171220
 	]]
-	RefreshFlyoutIconInfo()
+	FloFlyout.RefreshFlyoutIconInfo()
 	local totalItems = #FC_ICON_FILENAMES
 	local texture, _
 	if popup.selectedTexture then
 		local foundIndex = nil
 		for index=1, totalItems do
-			texture = GetFlyoutIconInfo(index)
+			texture = FloFlyout.GetFlyoutIconInfo(index)
 			if string.upper(texture) == popup.selectedTexture then
 				foundIndex = index
 				break
@@ -1113,7 +1113,7 @@ end
 --[[
 RefreshFlyoutIconInfo() counts how many uniquely textured spells the player has in the current flyout. 
 ]]
-function RefreshFlyoutIconInfo()
+function FloFlyout.RefreshFlyoutIconInfo()
 	FC_ICON_FILENAMES = {}
 	FC_ICON_FILENAMES[1] = "INV_MISC_QUESTIONMARK"
 	local index = 2
@@ -1144,12 +1144,12 @@ function RefreshFlyoutIconInfo()
 	GetMacroItemIcons(FC_ICON_FILENAMES)
 end
 
-function GetFlyoutIconInfo(index)
+function FloFlyout.GetFlyoutIconInfo(index)
 	return FC_ICON_FILENAMES[index]
 end
 
 function FloFlyoutConfigDialogPopup_Update()
-	RefreshFlyoutIconInfo()
+	FloFlyout.RefreshFlyoutIconInfo()
 
 	local popup = FloFlyoutConfigDialogPopup
 	local buttons = popup.buttons
@@ -1161,7 +1161,7 @@ function FloFlyoutConfigDialogPopup_Update()
 		local button = buttons[i]
 		index = (offset * NUM_FLYOUT_ICONS_PER_ROW) + i
 		if index <= #FC_ICON_FILENAMES then
-			texture = GetFlyoutIconInfo(index)
+			texture = FloFlyout.GetFlyoutIconInfo(index)
 
 			button.icon:SetTexture("INTERFACE\\ICONS\\"..texture)
 			button:Show()
@@ -1184,7 +1184,7 @@ function FloFlyoutConfigDialogPopup_Update()
 	FauxScrollFrame_Update(FloFlyoutConfigDialogPopupScrollFrame, ceil(#FC_ICON_FILENAMES / NUM_FLYOUT_ICONS_PER_ROW), NUM_FLYOUT_ICON_ROWS, FLYOUT_ICON_ROW_HEIGHT)
 end
 
-function FloFlyoutConfigDialogPopupOkay_Update()
+function FloFlyout.ConfigDialogPopupOkay_Update()
 	local popup = FloFlyoutConfigDialogPopup
 	local button = FloFlyoutConfigDialogPopupOkay
 	
@@ -1199,7 +1199,7 @@ function FloFlyoutConfigDialogPopupOkay_OnClick(self, button, pushed)
 	local popup = FloFlyoutConfigDialogPopup
 	local iconTexture
 	if popup.selectedIcon ~= 1 then
-		iconTexture = "INTERFACE\\ICONS\\"..GetFlyoutIconInfo(popup.selectedIcon)
+		iconTexture = "INTERFACE\\ICONS\\"..FloFlyout.GetFlyoutIconInfo(popup.selectedIcon)
 	end
 
 	if popup.isEdit then
@@ -1210,7 +1210,7 @@ function FloFlyoutConfigDialogPopupOkay_OnClick(self, button, pushed)
 		FloFlyout.config.flyouts[FloFlyout:AddFlyout()].icon = iconTexture
 	end
 	popup:Hide()
-	FloFlyoutConfigPane_Update()
+	FloFlyout.ConfigPane_Update()
 	FloFlyout:ApplyConfig()
 end
 
@@ -1224,7 +1224,7 @@ function FloFlyoutConfigPopupButton_OnClick(self, button, down)
 	popup.selectedIcon = (offset * NUM_FLYOUT_ICONS_PER_ROW) + self:GetID()
  	popup.selectedTexture = nil
 	FloFlyoutConfigDialogPopup_Update()
-	FloFlyoutConfigDialogPopupOkay_Update()
+	FloFlyout.ConfigDialogPopupOkay_Update()
 end
 
 

@@ -84,14 +84,7 @@ function FloFlyout.ReadCmd(line)
 		FloFlyout:RemoveAction(arg1)
 		FloFlyout:ApplyConfig()
 	else
-		DEFAULT_CHAT_FRAME:AddMessage( "FloFlyout usage :" );
-		DEFAULT_CHAT_FRAME:AddMessage( "/ffo addflyout : add a new flyout" );
-		DEFAULT_CHAT_FRAME:AddMessage( "/ffo removeflyout <flyoutid> : remove flyout" );
-		DEFAULT_CHAT_FRAME:AddMessage( "/ffo addspell <flyoutid> <spellid> : add a new spell to flyout" );
-		DEFAULT_CHAT_FRAME:AddMessage( "/ffo removespell <flyoutid> <spellpos> : remove spell from flyout" );
-		DEFAULT_CHAT_FRAME:AddMessage( "/ffo bind <actionid> <flyoutid> : bind action to flyout" );
-		DEFAULT_CHAT_FRAME:AddMessage( "/ffo unbind <actionid> : unbind action" );
-		DEFAULT_CHAT_FRAME:AddMessage( "/ffo panic||reset : Reset FloFlyout" );
+		DEFAULT_CHAT_FRAME:AddMessage(L["USAGE"]);
 		return;
 	end
 end
@@ -106,7 +99,7 @@ function FloFlyout_OnLoad(self)
 	SlashCmdList["FLOFLYOUT"] = FloFlyout.ReadCmd
 
 	StaticPopupDialogs["CONFIRM_DELETE_FLO_FLYOUT"] = {
-		text = CONFIRM_DELETE_EQUIPMENT_SET,
+		text = L["CONFIRM_DELETE"],
 		button1 = YES,
 		button2 = NO,
 		OnAccept = function (self) FloFlyout:RemoveFlyout(self.data); FloFlyout.ConfigPane_Update(); FloFlyout:ApplyConfig(); end,
@@ -956,7 +949,7 @@ function FloFlyout.ConfigPane_Update()
 			else
 				-- This is the Add New button
 				button.name = nil
-				button.text:SetText(PAPERDOLL_NEWEQUIPMENTSET)
+				button.text:SetText(L["NEW_FLYOUT"])
 				button.text:SetTextColor(GREEN_FONT_COLOR.r, GREEN_FONT_COLOR.g, GREEN_FONT_COLOR.b)
 				button.icon:SetTexture("Interface\\PaperDollInfoFrame\\Character-Plus")
 				button.icon:SetSize(30, 30)

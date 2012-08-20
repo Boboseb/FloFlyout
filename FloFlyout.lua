@@ -546,7 +546,11 @@ function FloFlyout:CreateOpener(name, idFlyout, actionId, direction, actionButto
 		stateCondition = "bar:"..actionBarPage
 	end
 	if bonusBar then
-		stateCondition = stateCondition..",bonusbar:"..bonusBar
+		if bonusBar == 0 then
+			stateCondition = stateCondition..",nobonusbar:1,nobonusbar:2,nobonusbar:3,nobonusbar:4"
+		else
+			stateCondition = stateCondition..",bonusbar:"..bonusBar
+		end
 	end
 	if stateCondition ~= "" then
 		RegisterStateDriver(opener, "visibility", "["..stateCondition.."] show; hide")

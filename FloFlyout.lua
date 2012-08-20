@@ -155,7 +155,7 @@ function FloFlyout_OnEvent(self, event, arg1, ...)
 		local idAction = arg1
 		-- Dans tous les cas, si nous avions un flyout sur cette action, il faut l'enlever de l'action et le mettre dans le curseur
 		local configChanged
-		local oldFlyoutId = FloFlyout.config.actions[GetActiveTalentGroup()][idAction]
+		local oldFlyoutId = FloFlyout.config.actions[GetActiveSpecGroup()][idAction]
 
 		local actionType, id, subType = GetActionInfo(idAction)
 		-- Si actionType vide, c'est sans doute que l'on vient de détruire la macro bidon
@@ -564,7 +564,7 @@ end
 
 function FloFlyout:ApplyConfig()
 	self:ClearOpeners()
-	for a,f in pairs(self.config.actions[GetActiveTalentGroup()]) do
+	for a,f in pairs(self.config.actions[GetActiveSpecGroup()]) do
 		self:BindFlyoutToAction(f, a)
 	end
 end
@@ -622,12 +622,12 @@ end
 function FloFlyout:AddAction(actionId, flyoutId)
 	if type(actionId) == "string" then actionId = tonumber(actionId) end
 	if type(flyoutId) == "string" then flyoutId = tonumber(flyoutId) end
-	self.config.actions[GetActiveTalentGroup()][actionId] = flyoutId
+	self.config.actions[GetActiveSpecGroup()][actionId] = flyoutId
 end
 
 function FloFlyout:RemoveAction(actionId)
 	if type(actionId) == "string" then actionId = tonumber(actionId) end
-	self.config.actions[GetActiveTalentGroup()][actionId] = nil
+	self.config.actions[GetActiveSpecGroup()][actionId] = nil
 end
 
 function FloFlyout:PickupFlyout(flyoutId)

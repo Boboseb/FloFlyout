@@ -6,7 +6,7 @@
 -- Constants
 -------------------------------------------------------------------------------
 
-local VERSION = "5.0.2"
+local VERSION = "5.0.3"
 local NAME = "FloFlyout"
 local SPELLFLYOUT_DEFAULT_SPACING = 4
 local SPELLFLYOUT_INITIAL_SPACING = 7
@@ -16,6 +16,7 @@ local STRIPE_COLOR = {r=0.9, g=0.9, b=1}
 -------------------------------------------------------------------------------
 -- Variables
 -------------------------------------------------------------------------------
+local _
 
 FLOFLYOUT_CONFIG = {
 	flyouts = {

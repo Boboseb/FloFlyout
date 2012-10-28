@@ -6,7 +6,7 @@
 -- Constants
 -------------------------------------------------------------------------------
 
-local VERSION = "5.0.3"
+local VERSION = "5.0.4"
 local NAME = "FloFlyout"
 local SPELLFLYOUT_DEFAULT_SPACING = 4
 local SPELLFLYOUT_INITIAL_SPACING = 7
@@ -112,7 +112,7 @@ function FloFlyout_OnLoad(self)
 	}
 
 	self:RegisterEvent("ADDON_LOADED")
-	--self:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED")
+	self:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED")
 	--self:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED")
 
 	self:RegisterEvent("PLAYER_ENTERING_WORLD")
@@ -542,9 +542,9 @@ function FloFlyout:CreateOpener(name, idFlyout, actionId, direction, actionButto
 		icon:SetTexture(texture)
 	end
 
-	local stateCondition = ""
+	local stateCondition = "nopetbattle,nooverridebar,novehicleui,nopossessbar"
 	if actionBarPage then
-		stateCondition = "bar:"..actionBarPage
+		stateCondition = ",bar:"..actionBarPage
 	end
 	if bonusBar then
 		if bonusBar == 0 then

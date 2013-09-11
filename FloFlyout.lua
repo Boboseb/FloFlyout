@@ -6,7 +6,7 @@
 -- Constants
 -------------------------------------------------------------------------------
 
-local VERSION = "5.3.4"
+local VERSION = "5.4.4"
 local NAME = "FloFlyout"
 local SPELLFLYOUT_DEFAULT_SPACING = 4
 local SPELLFLYOUT_INITIAL_SPACING = 7

@@ -1171,8 +1171,8 @@ function FloFlyout.RefreshFlyoutIconInfo()
 			end
 		end
 	end
+        GetLooseMacroIcons(FC_ICON_FILENAMES)
 	GetMacroIcons(FC_ICON_FILENAMES)
-	GetMacroItemIcons(FC_ICON_FILENAMES)
 end
 
 function FloFlyout.GetFlyoutIconInfo(index)
@@ -1194,7 +1194,11 @@ function FloFlyoutConfigDialogPopup_Update()
 		if index <= #FC_ICON_FILENAMES then
 			texture = FloFlyout.GetFlyoutIconInfo(index)
 
-			button.icon:SetTexture("INTERFACE\\ICONS\\"..texture)
+			if(type(texture) == "number") then
+                                button.icon:SetToFileData(texture);
+                        else
+                                button.icon:SetTexture("INTERFACE\\ICONS\\"..texture);
+                        end
 			button:Show()
 			if index == popup.selectedIcon then
 				button:SetChecked(1)

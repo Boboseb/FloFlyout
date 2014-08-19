@@ -22,7 +22,7 @@ FLOFLYOUT_CONFIG = {
 	flyouts = {
 		--[[ Sample config : each flyout can have a list of actions and an icon
 		[1] = {
-			actions = {
+			actionTypes = {
 				[1] = "spell",
 				[2] = "item",
 				[3] = "macro",
@@ -149,6 +149,9 @@ function FloFlyout_OnEvent(self, event, arg1, ...)
 				for i, _ in ipairs(flyout.spells) do
 					flyout.actionTypes[i] = "spell"
 				end
+			end
+			if flyout.mountIndex == nil then
+				flyout.mountIndex = {}
 			end
 		end
 
@@ -586,7 +589,7 @@ function FloFlyout:IsValidSpellPos(flyoutId, arg2)
 end
 
 function FloFlyout:AddFlyout()
-	table.insert(self.config.flyouts, { spells = {}, actionTypes = {} })
+	table.insert(self.config.flyouts, { spells = {}, actionTypes = {}, mountIndex = {} })
 	return #self.config.flyouts
 end
 
@@ -622,6 +625,7 @@ function FloFlyout:RemoveSpell(flyoutId, spellPos)
 	local flyoutConf = self.config.flyouts[flyoutId]
 	table.remove(flyoutConf.spells, spellPos)
 	table.remove(flyoutConf.actionTypes, spellPos)
+	table.remove(flyoutConf.mountIndex, spellPos)
 end
 
 function FloFlyout:AddAction(actionId, flyoutId)
@@ -690,8 +694,14 @@ function FloFlyoutButton_OnDragStart(self)
 
 	local actionType = self.actionType
 	local spell = self.spellID
+        local mountIndex = self.mountIndex
 	if actionType == "spell" then
-		PickupSpell(spell)
+                if mountIndex == nil then
+		        PickupSpell(spell)
+                else
+                        C_MountJournal.Pickup(mountIndex)
+                end
+                FloFlyout.mountIndex = mountIndex
 	elseif actionType == "item" then
 		PickupItem(spell)
 	end
@@ -704,18 +714,25 @@ function FloFlyoutButton_OnDragStart(self)
 	end
 end
 
+FloFlyout.mountIndex = nil;
+function FloFlyout.MountJournal_PickupHook(index)
+        FloFlyout.mountIndex = index;
+end
+hooksecurefunc(C_MountJournal, "Pickup", FloFlyout.MountJournal_PickupHook);
+
 function FloFlyoutButton_OnReceiveDrag(self)
 	local parent = self:GetParent()
 	if not parent.IsConfig then return end
 
 	local kind, info1, info2, info3 = GetCursorInfo()
-	local actionType, actionData
+	local actionType, actionData, mountIndex
 	if kind == "spell" then
 		actionType = "spell"
 		actionData = info3
-	elseif kind == "companion" then
+	elseif kind == "mount" then
 		actionType = "spell"
-		_, _, actionData, _, _ = GetCompanionInfo(info2, info1);
+	        _, actionData, _, _, _, _, _, _, _, _, _ = MountJournal_GetMountInfo(FloFlyout.mountIndex);
+                mountIndex = FloFlyout.mountIndex
 	elseif kind == "item" then
 		actionType = "item"
 		actionData = info1
@@ -724,13 +741,19 @@ function FloFlyoutButton_OnReceiveDrag(self)
 		local flyoutConf = FloFlyout.config.flyouts[parent.idFlyout]
 		local oldActionData = flyoutConf.spells[self:GetID()]
 		local oldActionType = flyoutConf.actionTypes[self:GetID()]
+		local oldMountIndex = flyoutConf.mountIndex[self:GetID()]
 		flyoutConf.spells[self:GetID()] = actionData
 		flyoutConf.actionTypes[self:GetID()] = actionType
+		flyoutConf.mountIndex[self:GetID()] = mountIndex
 		ClearCursor()
 		FloFlyout:ApplyConfig()
 		FloFlyoutConfigFlyoutFrame_Update(parent, parent.idFlyout)
 		if oldActionType == "spell" then
-			PickupSpell(oldActionData)
+                        if oldMountIndex == nil then
+			        PickupSpell(oldActionData)
+                        else
+                                C_MountJournal.Pickup(oldMountIndex)
+                        end
 		elseif oldActionType == "item" then
 			PickupItem(oldActionData)
 		end
@@ -748,10 +771,12 @@ function FloFlyoutConfigFlyoutFrame_Update(self, idFlyout)
 	local numButtons = 0;
 	local spells = FloFlyout.config.flyouts[idFlyout].spells
 	local actionTypes = FloFlyout.config.flyouts[idFlyout].actionTypes
+	local mountIndexes = FloFlyout.config.flyouts[idFlyout].mountIndex
 
 	for i=1, #spells+1 do
 		local spellID = spells[i]
 		local actionType = actionTypes[i]
+		local mountIndex = mountIndexes[i]
 		local button = _G["FloFlyoutConfigFlyoutFrameButton"..numButtons+1]
 
 		button:ClearAllPoints()
@@ -786,6 +811,7 @@ function FloFlyoutConfigFlyoutFrame_Update(self, idFlyout)
 		if spellID then
 			button.spellID = spellID
 			button.actionType = actionType
+                        button.mountIndex = mountIndex
 			local texture = FloFlyout:GetTexture(actionType, spellID)
 			_G[button:GetName().."Icon"]:SetTexture(texture)
 			SpellFlyoutButton_UpdateCooldown(button)
@@ -796,6 +822,7 @@ function FloFlyoutConfigFlyoutFrame_Update(self, idFlyout)
 			_G[button:GetName().."Icon"]:SetTexture(nil)
 			button.spellID = nil
 			button.actionType = nil
+                        button.mountIndex = nil
 		end
 
 		prevButton = button

@@ -539,7 +539,11 @@ function FloFlyout:CreateOpener(name, idFlyout, actionId, direction, actionButto
 
 	local icon = _G[opener:GetName().."Icon"]
 	if flyoutConf.icon then
-		icon:SetTexture(flyoutConf.icon)
+		if type(flyoutConf.icon) == "number" then
+                        icon:SetToFileData(flyoutConf.icon)
+                else
+                        icon:SetTexture("INTERFACE\\ICONS\\"..flyoutConf.icon)
+                end
 	elseif flyoutConf.spells[1] then
 		local texture = FloFlyout:GetTexture(flyoutConf.actionTypes[1], flyoutConf.spells[1])
 		icon:SetTexture(texture)
@@ -960,7 +964,11 @@ function FloFlyout.ConfigPane_Update()
 					texture = FloFlyout:GetTexture(flyout.actionTypes[1], flyout.spells[1])
 				end
 				if texture then
-					button.icon:SetTexture(texture)
+                                        if(type(texture) == "number") then
+                                                button.icon:SetToFileData(texture);
+                                        else
+                                                button.icon:SetTexture("INTERFACE\\ICONS\\"..texture);
+                                        end
 				else
 					button.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
 				end
@@ -1119,7 +1127,7 @@ function RecalculateFloFlyoutConfigDialogPopup(iconTexture)
 		local foundIndex = nil
 		for index=1, totalItems do
 			texture = FloFlyout.GetFlyoutIconInfo(index)
-			if string.upper(texture) == popup.selectedTexture then
+                        if texture == popup.selectedTexture then
 				foundIndex = index
 				break
 			end
@@ -1234,7 +1242,7 @@ function FloFlyoutConfigDialogPopupOkay_OnClick(self, button, pushed)
 	local popup = FloFlyoutConfigDialogPopup
 	local iconTexture
 	if popup.selectedIcon ~= 1 then
-		iconTexture = "INTERFACE\\ICONS\\"..FloFlyout.GetFlyoutIconInfo(popup.selectedIcon)
+		iconTexture = FloFlyout.GetFlyoutIconInfo(popup.selectedIcon)
 	end
 
 	if popup.isEdit then

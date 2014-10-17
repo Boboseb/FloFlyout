@@ -6,7 +6,7 @@
 -- Constants
 -------------------------------------------------------------------------------
 
-local VERSION = "6.0.6"
+local VERSION = "6.0.7"
 local NAME = "FloFlyout"
 local SPELLFLYOUT_DEFAULT_SPACING = 4
 local SPELLFLYOUT_INITIAL_SPACING = 7
@@ -656,9 +656,8 @@ function FloFlyout:PickupFlyout(flyoutId)
 		texture = FloFlyout:GetTexture(flyoutConf.actionTypes[1], flyoutConf.spells[1])
 	end
 	if not texture then
-		texture = "Interface\\Icons\\INV_Misc_QuestionMark"
+		texture = "INV_Misc_QuestionMark"
 	end
-	texture = string.sub(texture, string.len("INTERFACE\\ICONS\\") + 1)
 	-- Recreate dummy macro
 	DeleteMacro("__ffodnd")
 	local macroId = CreateMacro("__ffodnd", texture, flyoutId, nil, nil)

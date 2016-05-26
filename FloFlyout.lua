@@ -153,6 +153,9 @@ function FloFlyout_OnEvent(self, event, arg1, ...)
 			if flyout.mountIndex == nil then
 				flyout.mountIndex = {}
 			end
+                        if flyout.spellNames == nil then
+                                flyout.spellNames = {}
+                        end
 		end
 
 	elseif event == "ACTIONBAR_SLOT_CHANGED" then
@@ -517,11 +520,13 @@ function FloFlyout:CreateOpener(name, idFlyout, actionId, direction, actionButto
 	opener:SetAttribute("flyoutDirection", direction)
 	opener:SetFrameRef("FloFlyoutFrame", FloFlyoutFrame)
 	opener:SetAttribute("spelllist", strjoin(",", unpack(flyoutConf.spells)))
-	local spellnameList = {}, i, spellID
+	local spellnameList = flyoutConf.spellNames, i, spellID
 	for i, spellID in ipairs(flyoutConf.spells) do
-		spellnameList[i] = self:GetName(flyoutConf.actionTypes[i], spellID)
+                if spellnameList[i] == nil then
+                        spellnameList[i] = self:GetName(flyoutConf.actionTypes[i], spellID)
+                end
 	end
-	opener:SetAttribute("spellnamelist", strjoin(",", unpack(spellnameList)))
+	opener:SetAttribute("spellnamelist", strjoin(",", unpack(flyoutConf.spellNames)))
 	opener:SetAttribute("typelist", strjoin(",", unpack(flyoutConf.actionTypes)))
 
 	opener:SetScript("OnUpdate", Opener_UpdateFlyout)
@@ -630,6 +635,7 @@ function FloFlyout:RemoveSpell(flyoutId, spellPos)
 	table.remove(flyoutConf.spells, spellPos)
 	table.remove(flyoutConf.actionTypes, spellPos)
 	table.remove(flyoutConf.mountIndex, spellPos)
+	table.remove(flyoutConf.spellNames, spellPos)
 end
 
 function FloFlyout:AddAction(actionId, flyoutId)
@@ -745,9 +751,11 @@ function FloFlyoutButton_OnReceiveDrag(self)
 		local oldActionData = flyoutConf.spells[self:GetID()]
 		local oldActionType = flyoutConf.actionTypes[self:GetID()]
 		local oldMountIndex = flyoutConf.mountIndex[self:GetID()]
+                local oldSpellName = flyoutConf.spellNames[self:GetID()]
 		flyoutConf.spells[self:GetID()] = actionData
 		flyoutConf.actionTypes[self:GetID()] = actionType
 		flyoutConf.mountIndex[self:GetID()] = mountIndex
+                flyoutConf.spellNames[self:GetID()] = FloFlyout:GetName(flyoutConf.actionTypes[i], actionData)
 		ClearCursor()
 		FloFlyout:ApplyConfig()
 		FloFlyoutConfigFlyoutFrame_Update(parent, parent.idFlyout)

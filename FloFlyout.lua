@@ -776,7 +776,7 @@ function FloFlyoutConfigFlyoutFrame_Update(self, idFlyout)
 	local actionTypes = FloFlyout.config.flyouts[idFlyout].actionTypes
 	local mountIndexes = FloFlyout.config.flyouts[idFlyout].mountIndex
 
-	for i=1, #spells+1 do
+	for i=1, math.min(#spells+1, 10) do
 		local spellID = spells[i]
 		local actionType = actionTypes[i]
 		local mountIndex = mountIndexes[i]

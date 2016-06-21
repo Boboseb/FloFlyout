@@ -598,7 +598,7 @@ function FloFlyout:IsValidSpellPos(flyoutId, arg2)
 end
 
 function FloFlyout:AddFlyout()
-	table.insert(self.config.flyouts, { spells = {}, actionTypes = {}, mountIndex = {} })
+	table.insert(self.config.flyouts, { spells = {}, actionTypes = {}, mountIndex = {}, spellNames = {} })
 	return #self.config.flyouts
 end
 

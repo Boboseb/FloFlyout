@@ -49,6 +49,8 @@ FLOFLYOUT_CONFIG = {
 		},
 		[2] = {
 		},
+		[3] = {
+		},
 	}
 }
 
@@ -112,7 +114,7 @@ function FloFlyout_OnLoad(self)
 	}
 
 	self:RegisterEvent("ADDON_LOADED")
-	self:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED")
+	self:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
 	--self:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED")
 
 	self:RegisterEvent("PLAYER_ENTERING_WORLD")
@@ -158,11 +160,15 @@ function FloFlyout_OnEvent(self, event, arg1, ...)
                         end
 		end
 
+                if FloFlyout.config.actions[3] == nil then
+                        FloFlyout.config.actions[3] = {}
+                end
+
 	elseif event == "ACTIONBAR_SLOT_CHANGED" then
 		local idAction = arg1
 		-- Dans tous les cas, si nous avions un flyout sur cette action, il faut l'enlever de l'action et le mettre dans le curseur
 		local configChanged
-		local oldFlyoutId = FloFlyout.config.actions[GetActiveSpecGroup()][idAction]
+		local oldFlyoutId = FloFlyout.config.actions[GetSpecialization()][idAction]
 
 		local actionType, id, subType = GetActionInfo(idAction)
 		-- Si actionType vide, c'est sans doute que l'on vient de détruire la macro bidon
@@ -190,7 +196,7 @@ function FloFlyout_OnEvent(self, event, arg1, ...)
 
 	elseif event == "UPDATE_BINDINGS" then
 
-	elseif event == "ACTIVE_TALENT_GROUP_CHANGED" then
+	elseif event == "PLAYER_SPECIALIZATION_CHANGED" then
 		FloFlyout:ApplyConfig()
 	else
 
@@ -545,7 +551,7 @@ function FloFlyout:CreateOpener(name, idFlyout, actionId, direction, actionButto
 	local icon = _G[opener:GetName().."Icon"]
 	if flyoutConf.icon then
 		if type(flyoutConf.icon) == "number" then
-                        icon:SetToFileData(flyoutConf.icon)
+                        icon:SetTexture(flyoutConf.icon)
                 else
                         icon:SetTexture("INTERFACE\\ICONS\\"..flyoutConf.icon)
                 end
@@ -581,7 +587,7 @@ end
 
 function FloFlyout:ApplyConfig()
 	self:ClearOpeners()
-	for a,f in pairs(self.config.actions[GetActiveSpecGroup()]) do
+	for a,f in pairs(self.config.actions[GetSpecialization()]) do
 		self:BindFlyoutToAction(f, a)
 	end
 end
@@ -641,12 +647,12 @@ end
 function FloFlyout:AddAction(actionId, flyoutId)
 	if type(actionId) == "string" then actionId = tonumber(actionId) end
 	if type(flyoutId) == "string" then flyoutId = tonumber(flyoutId) end
-	self.config.actions[GetActiveSpecGroup()][actionId] = flyoutId
+	self.config.actions[GetSpecialization()][actionId] = flyoutId
 end
 
 function FloFlyout:RemoveAction(actionId)
 	if type(actionId) == "string" then actionId = tonumber(actionId) end
-	self.config.actions[GetActiveSpecGroup()][actionId] = nil
+	self.config.actions[GetSpecialization()][actionId] = nil
 end
 
 function FloFlyout:PickupFlyout(flyoutId)
@@ -740,7 +746,7 @@ function FloFlyoutButton_OnReceiveDrag(self)
 		actionData = info3
 	elseif kind == "mount" then
 		actionType = "spell"
-	        _, actionData, _, _, _, _, _, _, _, _, _ = MountJournal_GetMountInfo(FloFlyout.mountIndex);
+	        _, actionData, _, _, _, _, _, _, _, _, _ = C_MountJournal.GetDisplayedMountInfo(FloFlyout.mountIndex);
                 mountIndex = FloFlyout.mountIndex
 	elseif kind == "item" then
 		actionType = "item"
@@ -972,7 +978,7 @@ function FloFlyout.ConfigPane_Update()
 				end
 				if texture then
                                         if(type(texture) == "number") then
-                                                button.icon:SetToFileData(texture);
+                                                button.icon:SetTexture(texture);
                                         else
                                                 button.icon:SetTexture("INTERFACE\\ICONS\\"..texture);
                                         end
@@ -1210,7 +1216,7 @@ function FloFlyoutConfigDialogPopup_Update()
 			texture = FloFlyout.GetFlyoutIconInfo(index)
 
 			if(type(texture) == "number") then
-                                button.icon:SetToFileData(texture);
+                                button.icon:SetTexture(texture);
                         else
                                 button.icon:SetTexture("INTERFACE\\ICONS\\"..texture);
                         end

@@ -586,6 +586,10 @@ function FloFlyout:ClearOpeners()
 end
 
 function FloFlyout:ApplyConfig()
+	if InCombatLockdown() then
+		return
+	end
+
 	self:ClearOpeners()
 	for a,f in pairs(self.config.actions[GetSpecialization()]) do
 		self:BindFlyoutToAction(f, a)

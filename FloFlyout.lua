@@ -1047,8 +1047,12 @@ end
 
 function FloFlyoutConfigButton_OnClick(self, button, down)
 	if self.name and self.name ~= "" then
-		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)		-- inappropriately named, but a good sound.
-		FloFlyoutConfigPane.selectedIdx = self.name
+                if FloFlyoutConfigPane.selectedIdx == self.name then
+                  	FloFlyoutConfigPane.selectedIdx = nil
+                else
+		        PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)		-- inappropriately named, but a good sound.
+		        FloFlyoutConfigPane.selectedIdx = self.name
+                end
 		FloFlyout.ConfigPane_Update()
 		FloFlyoutConfigDialogPopup:Hide()
 	else

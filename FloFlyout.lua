@@ -1047,7 +1047,7 @@ end
 
 function FloFlyoutConfigButton_OnClick(self, button, down)
 	if self.name and self.name ~= "" then
-		PlaySound("igMainMenuOptionCheckBoxOn")		-- inappropriately named, but a good sound.
+		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)		-- inappropriately named, but a good sound.
 		FloFlyoutConfigPane.selectedIdx = self.name
 		FloFlyout.ConfigPane_Update()
 		FloFlyoutConfigDialogPopup:Hide()
@@ -1107,7 +1107,7 @@ function FloFlyoutConfigDialogPopup_OnLoad (self)
 end
 
 function FloFlyoutConfigDialogPopup_OnShow(self)
-	PlaySound("igCharacterInfoOpen")
+        PlaySound(SOUNDKIT.IG_CHARACTER_INFO_OPEN)
 	self.name = nil
 	self.isEdit = false
 	RecalculateFloFlyoutConfigDialogPopup()

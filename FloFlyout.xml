@@ -476,7 +476,7 @@
 				<Scripts>
 					<OnClick>
 						FloFlyoutConfigDialogPopupCancel_OnClick(self, button, pushed);
-						PlaySound("gsTitleOptionOK");
+						PlaySound(SOUNDKIT.GS_TITLE_OPTION_OK);
 					</OnClick>
 				</Scripts>
 			</Button>					
@@ -490,7 +490,7 @@
 				<Scripts>
 					<OnClick>
 						FloFlyoutConfigDialogPopupOkay_OnClick(self, button, pushed);
-						PlaySound("gsTitleOptionOK");
+						PlaySound(SOUNDKIT.GS_TITLE_OPTION_OK);
 					</OnClick>
 				</Scripts>
 			</Button>

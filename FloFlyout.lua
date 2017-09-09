@@ -617,7 +617,7 @@ function FloFlyout:RemoveFlyout(flyoutId)
 	table.remove(self.config.flyouts, flyoutId)
 	-- shift references
 	local i, a, f
-	for i = 1, 2 do
+	for i = 1, 3 do
 		for a,f in pairs(self.config.actions[i]) do
 			if f == flyoutId then
 				self.config.actions[i][a] = nil

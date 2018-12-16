@@ -6,7 +6,7 @@
 -- Constants
 -------------------------------------------------------------------------------
 
-local VERSION = "8.0.11"
+local VERSION = "8.0.12"
 local NAME = "FloFlyout"
 local SPELLFLYOUT_DEFAULT_SPACING = 4
 local SPELLFLYOUT_INITIAL_SPACING = 7
@@ -521,7 +521,8 @@ function FloFlyout:CreateOpener(name, idFlyout, actionId, direction, actionButto
 	opener.actionId = actionId
 
 	opener:SetAllPoints(actionButton)
-	opener:SetFrameStrata("DIALOG")
+	opener:SetFrameStrata("MEDIUM")
+	opener:SetFrameLevel(100)
 
 	opener:SetAttribute("flyoutDirection", direction)
 	opener:SetFrameRef("FloFlyoutFrame", FloFlyoutFrame)

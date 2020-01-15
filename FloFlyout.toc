@@ -1,4 +1,4 @@
-## Interface: 80205
+## Interface: 80300
 ## Title: FloFlyout
 ## Author: Floraline
 ## Notes: Create custom Flyout buttons

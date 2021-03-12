@@ -521,8 +521,8 @@ function FloFlyout:CreateOpener(name, idFlyout, actionId, direction, actionButto
 	opener.actionId = actionId
 
 	opener:SetAllPoints(actionButton)
-	opener:SetFrameStrata("HIGH")
-	opener:SetFrameLevel(100)
+	opener:SetFrameStrata("MEDIUM")
+	opener:SetToplevel(true)
 
 	opener:SetAttribute("flyoutDirection", direction)
 	opener:SetFrameRef("FloFlyoutFrame", FloFlyoutFrame)

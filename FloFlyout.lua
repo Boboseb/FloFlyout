@@ -70,7 +70,6 @@ local L = FLOFLYOUT_L10N_STRINGS
 -------------------------------------------------------------------------------
 
 function FloFlyout.ReadCmd(line)
-	local i, v, flyoutid;
 	local cmd, arg1, arg2 = strsplit(' ', line or "", 3);
 
 	if cmd == "addflyout" then
@@ -141,14 +140,12 @@ function FloFlyout_OnEvent(self, event, arg1, ...)
 		-- Ici, nous avons rechargé notre configuration
 		FloFlyout.config = FLOFLYOUT_CONFIG
 
-		local button
 		for _, button in ipairs({FloFlyoutFrame:GetChildren()}) do
 			SecureHandlerWrapScript(button, "OnClick", button, "self:GetParent():Hide()")
 		end
 
 		FloFlyoutConfigFlyoutFrame.IsConfig = true
 		
-		local i, flyout
 		for _, flyout in ipairs(FloFlyout.config.flyouts) do
 			if flyout.actionTypes == nil then
 				flyout.actionTypes = {}
@@ -533,11 +530,11 @@ function FloFlyout:CreateOpener(name, idFlyout, actionId, direction, actionButto
 	opener:SetAttribute("flyoutDirection", direction)
 	opener:SetFrameRef("FloFlyoutFrame", FloFlyoutFrame)
 	opener:SetAttribute("spelllist", strjoin(",", unpack(flyoutConf.spells)))
-	local spellnameList = flyoutConf.spellNames, i, spellID
+	local spellnameList = flyoutConf.spellNames
 	for i, spellID in ipairs(flyoutConf.spells) do
-                if spellnameList[i] == nil then
-                        spellnameList[i] = self:GetName(flyoutConf.actionTypes[i], spellID)
-                end
+		if spellnameList[i] == nil then
+			spellnameList[i] = self:GetName(flyoutConf.actionTypes[i], spellID)
+		end
 	end
 	opener:SetAttribute("spellnamelist", strjoin(",", unpack(flyoutConf.spellNames)))
 	opener:SetAttribute("typelist", strjoin(",", unpack(flyoutConf.actionTypes)))
@@ -558,10 +555,10 @@ function FloFlyout:CreateOpener(name, idFlyout, actionId, direction, actionButto
 	local icon = _G[opener:GetName().."Icon"]
 	if flyoutConf.icon then
 		if type(flyoutConf.icon) == "number" then
-                        icon:SetTexture(flyoutConf.icon)
-                else
-                        icon:SetTexture("INTERFACE\\ICONS\\"..flyoutConf.icon)
-                end
+			icon:SetTexture(flyoutConf.icon)
+		else
+			icon:SetTexture("INTERFACE\\ICONS\\"..flyoutConf.icon)
+		end
 	elseif flyoutConf.spells[1] then
 		local texture = FloFlyout:GetTexture(flyoutConf.actionTypes[1], flyoutConf.spells[1])
 		icon:SetTexture(texture)
@@ -623,7 +620,6 @@ function FloFlyout:RemoveFlyout(flyoutId)
 	if type(flyoutId) == "string" then flyoutId = tonumber(flyoutId) end
 	table.remove(self.config.flyouts, flyoutId)
 	-- shift references
-	local i, a, f
 	for i = 1, 3 do
 		for a,f in pairs(self.config.actions[i]) do
 			if f == flyoutId then
@@ -720,14 +716,14 @@ function FloFlyoutButton_OnDragStart(self)
 
 	local actionType = self.actionType
 	local spell = self.spellID
-        local mountIndex = self.mountIndex
+	local mountIndex = self.mountIndex
 	if actionType == "spell" then
-                if mountIndex == nil then
-		        PickupSpell(spell)
-                else
-                        C_MountJournal.Pickup(mountIndex)
-                end
-                FloFlyout.mountIndex = mountIndex
+		if mountIndex == nil then
+			PickupSpell(spell)
+		else
+				C_MountJournal.Pickup(mountIndex)
+		end
+		FloFlyout.mountIndex = mountIndex
 	elseif actionType == "item" then
 		PickupItem(spell)
 	end
@@ -742,7 +738,7 @@ end
 
 FloFlyout.mountIndex = nil;
 function FloFlyout.MountJournal_PickupHook(index)
-        FloFlyout.mountIndex = index;
+	FloFlyout.mountIndex = index;
 end
 hooksecurefunc(C_MountJournal, "Pickup", FloFlyout.MountJournal_PickupHook);
 
@@ -757,8 +753,8 @@ function FloFlyoutButton_OnReceiveDrag(self)
 		actionData = info3
 	elseif kind == "mount" then
 		actionType = "spell"
-	        _, actionData, _, _, _, _, _, _, _, _, _ = C_MountJournal.GetDisplayedMountInfo(FloFlyout.mountIndex);
-                mountIndex = FloFlyout.mountIndex
+		_, actionData, _, _, _, _, _, _, _, _, _ = C_MountJournal.GetDisplayedMountInfo(FloFlyout.mountIndex);
+		mountIndex = FloFlyout.mountIndex
 	elseif kind == "item" then
 		actionType = "item"
 		actionData = info1
@@ -768,20 +764,20 @@ function FloFlyoutButton_OnReceiveDrag(self)
 		local oldActionData = flyoutConf.spells[self:GetID()]
 		local oldActionType = flyoutConf.actionTypes[self:GetID()]
 		local oldMountIndex = flyoutConf.mountIndex[self:GetID()]
-                local oldSpellName = flyoutConf.spellNames[self:GetID()]
+		local oldSpellName = flyoutConf.spellNames[self:GetID()]
 		flyoutConf.spells[self:GetID()] = actionData
 		flyoutConf.actionTypes[self:GetID()] = actionType
 		flyoutConf.mountIndex[self:GetID()] = mountIndex
-                flyoutConf.spellNames[self:GetID()] = FloFlyout:GetName(flyoutConf.actionTypes[i], actionData)
+		flyoutConf.spellNames[self:GetID()] = FloFlyout:GetName(flyoutConf.actionTypes[i], actionData)
 		ClearCursor()
 		FloFlyout:ApplyConfig()
 		FloFlyoutConfigFlyoutFrame_Update(parent, parent.idFlyout)
 		if oldActionType == "spell" then
-                        if oldMountIndex == nil then
-			        PickupSpell(oldActionData)
-                        else
-                                C_MountJournal.Pickup(oldMountIndex)
-                        end
+			if oldMountIndex == nil then
+				PickupSpell(oldActionData)
+			else
+					C_MountJournal.Pickup(oldMountIndex)
+			end
 		elseif oldActionType == "item" then
 			PickupItem(oldActionData)
 		end
@@ -839,7 +835,7 @@ function FloFlyoutConfigFlyoutFrame_Update(self, idFlyout)
 		if spellID then
 			button.spellID = spellID
 			button.actionType = actionType
-                        button.mountIndex = mountIndex
+			button.mountIndex = mountIndex
 			local texture = FloFlyout:GetTexture(actionType, spellID)
 			_G[button:GetName().."Icon"]:SetTexture(texture)
 			SpellFlyoutButton_UpdateCooldown(button)
@@ -850,7 +846,7 @@ function FloFlyoutConfigFlyoutFrame_Update(self, idFlyout)
 			_G[button:GetName().."Icon"]:SetTexture(nil)
 			button.spellID = nil
 			button.actionType = nil
-                        button.mountIndex = nil
+			button.mountIndex = nil
 		end
 
 		prevButton = button
@@ -863,18 +859,18 @@ function FloFlyoutConfigFlyoutFrame_Update(self, idFlyout)
 		_G["FloFlyoutConfigFlyoutFrameButton"..unusedButtonIndex]:Hide()
 		unusedButtonIndex = unusedButtonIndex+1
 	end
-	
+
 	if numButtons == 0 then
 		self:Hide()
 		return
 	end
-	
+
 	-- Show the flyout
 	self:SetFrameStrata("DIALOG")
 	self:ClearAllPoints()
-	
+
 	local distance = 3
-	
+
 	self.BgEnd:ClearAllPoints()
 	if direction == "UP" then
 		self:SetPoint("BOTTOM", parent, "TOP", 0, 0)
@@ -913,7 +909,7 @@ function FloFlyoutConfigFlyoutFrame_Update(self, idFlyout)
 		self.HorizBg:SetPoint("RIGHT", self.BgEnd, "LEFT")
 		self.HorizBg:SetPoint("LEFT", distance, 0)
 	end
-	
+
 	if direction == "UP" or direction == "DOWN" then
 		self:SetWidth(prevButton:GetWidth())
 		self:SetHeight((prevButton:GetHeight()+SPELLFLYOUT_DEFAULT_SPACING) * numButtons - SPELLFLYOUT_DEFAULT_SPACING + SPELLFLYOUT_INITIAL_SPACING + SPELLFLYOUT_FINAL_SPACING)
@@ -964,18 +960,18 @@ end
 function FloFlyout.ConfigPane_Update()
 	local numRows = #FloFlyout.config.flyouts + 1
 	HybridScrollFrame_Update(FloFlyoutConfigPane, numRows * EQUIPMENTSET_BUTTON_HEIGHT + 20, FloFlyoutConfigPane:GetHeight())
-	
+
 	local scrollOffset = HybridScrollFrame_GetOffset(FloFlyoutConfigPane)
 	local buttons = FloFlyoutConfigPane.buttons
 	local selectedIdx = FloFlyoutConfigPane.selectedIdx
 	FloFlyoutConfigFlyoutFrame:Hide()
-	local name, texture, button, flyout
+	local texture, button, flyout
 	for i = 1, #buttons do
 		if i+scrollOffset <= numRows then
 			button = buttons[i]
 			buttons[i]:Show()
 			button:Enable()
-			
+
 			if i+scrollOffset < numRows then
 				-- Normal flyout button
 				button.name = i+scrollOffset
@@ -996,7 +992,7 @@ function FloFlyout.ConfigPane_Update()
 				else
 					button.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
 				end
-							
+
 				if selectedIdx and (i+scrollOffset) == selectedIdx then
 					button.SelectedBar:Show()
 					button.Arrow:Show()
@@ -1007,7 +1003,7 @@ function FloFlyout.ConfigPane_Update()
 					button.SelectedBar:Hide()
 					button.Arrow:Hide()
 				end
-				
+
 				button.icon:SetSize(36, 36)
 				button.icon:SetPoint("LEFT", 4, 0)
 			else
@@ -1021,7 +1017,7 @@ function FloFlyout.ConfigPane_Update()
 				button.SelectedBar:Hide()
 				button.Arrow:Hide()
 			end
-			
+
 			if (i+scrollOffset) == 1 then
 				buttons[i].BgTop:Show()
 				buttons[i].BgMiddle:SetPoint("TOP", buttons[i].BgTop, "BOTTOM")
@@ -1029,7 +1025,7 @@ function FloFlyout.ConfigPane_Update()
 				buttons[i].BgTop:Hide()
 				buttons[i].BgMiddle:SetPoint("TOP")
 			end
-			
+
 			if (i+scrollOffset) == numRows then
 				buttons[i].BgBottom:Show()
 				buttons[i].BgMiddle:SetPoint("BOTTOM", buttons[i].BgBottom, "TOP")
@@ -1054,12 +1050,12 @@ end
 
 function FloFlyoutConfigButton_OnClick(self, button, down)
 	if self.name and self.name ~= "" then
-                if FloFlyoutConfigPane.selectedIdx == self.name then
-                  	FloFlyoutConfigPane.selectedIdx = nil
-                else
-		        PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)		-- inappropriately named, but a good sound.
-		        FloFlyoutConfigPane.selectedIdx = self.name
-                end
+		if FloFlyoutConfigPane.selectedIdx == self.name then
+			FloFlyoutConfigPane.selectedIdx = nil
+		else
+			PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)		-- inappropriately named, but a good sound.
+			FloFlyoutConfigPane.selectedIdx = self.name
+		end
 		FloFlyout.ConfigPane_Update()
 		FloFlyoutConfigDialogPopup:Hide()
 	else
@@ -1084,19 +1080,17 @@ local FC_ICON_FILENAMES = {}
 
 function FloFlyoutConfigDialogPopup_OnLoad (self)
 	self.buttons = {}
-	
-	local rows = 0
-	
+
 	local button = CreateFrame("CheckButton", "FloFlyoutConfigDialogPopupButton1", FloFlyoutConfigDialogPopup, "FloFlyoutConfigPopupButtonTemplate")
 	button:SetPoint("TOPLEFT", 24, -37)
 	button:SetID(1)
 	tinsert(self.buttons, button)
-	
+
 	local lastPos
 	for i = 2, NUM_FLYOUT_ICONS_SHOWN do
 		button = CreateFrame("CheckButton", "FloFlyoutConfigDialogPopupButton" .. i, FloFlyoutConfigDialogPopup, "FloFlyoutConfigPopupButtonTemplate")
 		button:SetID(i)
-		
+
 		lastPos = (i - 1) / NUM_FLYOUT_ICONS_PER_ROW
 		if lastPos == math.floor(lastPos) then
 			button:SetPoint("TOPLEFT", self.buttons[i-NUM_FLYOUT_ICONS_PER_ROW], "BOTTOMLEFT", 0, -8)
@@ -1118,7 +1112,7 @@ function FloFlyoutConfigDialogPopup_OnLoad (self)
 end
 
 function FloFlyoutConfigDialogPopup_OnShow(self)
-        PlaySound(SOUNDKIT.IG_CHARACTER_INFO_OPEN)
+	PlaySound(SOUNDKIT.IG_CHARACTER_INFO_OPEN)
 	self.name = nil
 	self.isEdit = false
 	RecalculateFloFlyoutConfigDialogPopup()
@@ -1134,13 +1128,13 @@ end
 
 function RecalculateFloFlyoutConfigDialogPopup(iconTexture)
 	local popup = FloFlyoutConfigDialogPopup;
-	
+
 	if iconTexture then
 		popup:SetSelection(true, iconTexture)
 	else
 		popup:SetSelection(false, 1)
 	end
-	
+
 	--[[ 
 	Scroll and ensure that any selected equipment shows up in the list.
 	When we first press "save", we want to make sure any selected equipment set shows up in the list, so that
@@ -1155,7 +1149,7 @@ function RecalculateFloFlyoutConfigDialogPopup(iconTexture)
 		local foundIndex = nil
 		for index=1, totalItems do
 			texture = FloFlyout.GetFlyoutIconInfo(index)
-                        if texture == popup.selectedTexture then
+			if texture == popup.selectedTexture then
 				foundIndex = index
 				break
 			end
@@ -1187,7 +1181,6 @@ function FloFlyout.RefreshFlyoutIconInfo()
 
 	local popup = FloFlyoutConfigDialogPopup
 	if popup.name then
-		local i
 		local spells = FloFlyout.config.flyouts[popup.name].spells
 		local actionTypes = FloFlyout.config.flyouts[popup.name].actionTypes
 		for i = 1, #spells do
@@ -1207,7 +1200,7 @@ function FloFlyout.RefreshFlyoutIconInfo()
 			end
 		end
 	end
-        GetLooseMacroIcons(FC_ICON_FILENAMES)
+	GetLooseMacroIcons(FC_ICON_FILENAMES)
 	GetMacroIcons(FC_ICON_FILENAMES)
 end
 
@@ -1221,9 +1214,8 @@ function FloFlyoutConfigDialogPopup_Update()
 	local popup = FloFlyoutConfigDialogPopup
 	local buttons = popup.buttons
 	local offset = FauxScrollFrame_GetOffset(FloFlyoutConfigDialogPopupScrollFrame) or 0
-	local button
 	-- Icon list
-	local texture, index, button, realIndex, _
+	local texture, index, _
 	for i=1, NUM_FLYOUT_ICONS_SHOWN do
 		local button = buttons[i]
 		index = (offset * NUM_FLYOUT_ICONS_PER_ROW) + i
@@ -1231,10 +1223,10 @@ function FloFlyoutConfigDialogPopup_Update()
 			texture = FloFlyout.GetFlyoutIconInfo(index)
 
 			if(type(texture) == "number") then
-                                button.icon:SetTexture(texture);
-                        else
-                                button.icon:SetTexture("INTERFACE\\ICONS\\"..texture);
-                        end
+				button.icon:SetTexture(texture);
+			else
+				button.icon:SetTexture("INTERFACE\\ICONS\\"..texture);
+			end
 			button:Show()
 			if index == popup.selectedIcon then
 				button:SetChecked(1)
@@ -1248,9 +1240,9 @@ function FloFlyoutConfigDialogPopup_Update()
 			button.icon:SetTexture("")
 			button:Hide()
 		end
-		
+
 	end
-	
+
 	-- Scrollbar stuff
 	FauxScrollFrame_Update(FloFlyoutConfigDialogPopupScrollFrame, ceil(#FC_ICON_FILENAMES / NUM_FLYOUT_ICONS_PER_ROW), NUM_FLYOUT_ICON_ROWS, FLYOUT_ICON_ROW_HEIGHT)
 end
@@ -1258,7 +1250,7 @@ end
 function FloFlyout.ConfigDialogPopupOkay_Update()
 	local popup = FloFlyoutConfigDialogPopup
 	local button = FloFlyoutConfigDialogPopupOkay
-	
+
 	if popup.selectedIcon --[[and popup.name]] then
 		button:Enable()
 	else

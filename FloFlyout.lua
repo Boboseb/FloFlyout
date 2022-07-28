@@ -6,7 +6,7 @@
 -- Constants
 -------------------------------------------------------------------------------
 
-local VERSION = "9.2.15.5"
+local VERSION = "9.2.16.5"
 local NAME = "FloFlyout"
 local SPELLFLYOUT_DEFAULT_SPACING = 4
 local SPELLFLYOUT_INITIAL_SPACING = 7
@@ -50,6 +50,10 @@ FLOFLYOUT_CONFIG = {
 		[2] = {
 		},
 		[3] = {
+		},
+		[4] = {
+		},
+		[5] = {
 		},
 	}
 }
@@ -155,14 +159,16 @@ function FloFlyout_OnEvent(self, event, arg1, ...)
 			if flyout.mountIndex == nil then
 				flyout.mountIndex = {}
 			end
-                        if flyout.spellNames == nil then
-                                flyout.spellNames = {}
-                        end
+			if flyout.spellNames == nil then
+					flyout.spellNames = {}
+			end
 		end
 
-                if FloFlyout.config.actions[3] == nil then
-                        FloFlyout.config.actions[3] = {}
-                end
+		for i=3,5 do
+			if FloFlyout.config.actions[i] == nil then
+				FloFlyout.config.actions[i] = {}
+			end
+		end
 
 	elseif event == "ACTIONBAR_SLOT_CHANGED" then
 		local idAction = arg1

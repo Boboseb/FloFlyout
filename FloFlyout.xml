@@ -23,14 +23,15 @@
 		</Scripts>
 	</Frame>
 
-	<CheckButton name="FloFlyoutButtonTemplate" virtual="TRUE" inherits="ActionButtonTemplate, SecureActionButtonTemplate">
-		<Size x="28" y="28"/>
+	<CheckButton name="FloFlyoutButtonTemplate" virtual="TRUE" inherits="SmallActionButtonTemplate, SecureActionButtonTemplate">
 		<Scripts>
 			<OnLoad>
+				self:SmallActionButtonMixin_OnLoad()
+				self.PushedTexture:SetSize(31.6, 30.9)
 				self:RegisterForDrag("LeftButton")
 				_G[self:GetName().."Count"]:SetPoint("BOTTOMRIGHT", 0, 0)
 				self.maxDisplayCount = 99
-				_G[self:GetName().."Icon"]:SetTexCoord(4/64, 60/64, 4/64, 60/64)
+				self:RegisterForClicks("LeftButtonDown", "LeftButtonUp")
 			</OnLoad>
 			<OnEnter function="FloFlyoutButton_SetTooltip" />
 			<OnLeave>
@@ -40,30 +41,30 @@
 			<OnReceiveDrag function="FloFlyoutButton_OnReceiveDrag" />
 			<OnMouseUp function="FloFlyoutButton_OnReceiveDrag" />
 			<PreClick>
-				self:SetChecked(not self:GetChecked());
+				self:SetChecked(false)
 			</PreClick>
 		</Scripts>
 		<NormalTexture/>
 	</CheckButton>
 
 	<Frame name="FloFlyoutFrameTemplate" frameStrata="DIALOG" frameLevel="10" parent="UIParent" hidden="true" virtual="TRUE">
-		<Layers>
-			<Layer level="BACKGROUND">
-				<Texture name="$parentBackgroundEnd" inherits="ActionBarFlyoutButton-FlyoutTop" parentKey="BgEnd"/>
-				<Texture name="$parentHorizontalBackground" file="Interface\Buttons\ActionBarFlyoutButton-FlyoutMidLeft" parentKey="HorizBg" horizTile="true" hidden="true">
-					<Size x="32" y="37"/>
-					<TexCoords left="0" right="1" top="0" bottom="0.578125"/>
-				</Texture>
-				<Texture name="$parentVerticalBackground" file="Interface\Buttons\ActionBarFlyoutButton-FlyoutMid" parentKey="VertBg" vertTile="true" hidden="true">
-					<Size x="37" y="32"/>
-					<TexCoords left="0" right="0.578125" top="0" bottom="1"/>
-				</Texture>
-			</Layer>
-		</Layers>
 		<Size>
 			<AbsDimension x="44" y="44"/>
 		</Size>
 		<Frames>
+			<Frame parentKey="Background" setAllPoints="true">
+				<Layers>
+					<Layer level="BACKGROUND">
+						<Texture parentKey="End" atlas="UI-HUD-ActionBar-IconFrame-FlyoutButton" useAtlasSize="true"/>
+						<Texture parentKey="HorizontalMiddle" atlas="_UI-HUD-ActionBar-IconFrame-FlyoutMidLeft" useAtlasSize="true" horizTile="true" hidden="true"/>
+						<Texture parentKey="VerticalMiddle" atlas="!UI-HUD-ActionBar-IconFrame-FlyoutMid" useAtlasSize="true" vertTile="true" hidden="true"/>
+						<Texture parentKey="Start" atlas="UI-HUD-ActionBar-IconFrame-FlyoutBottom" useAtlasSize="true"/>
+					</Layer>
+				</Layers>
+				<KeyValues>
+					<KeyValue key="ignoreInlayout" value="true" type="boolean"/>
+				</KeyValues>
+			</Frame>
 			<CheckButton name="$parentButton1" inherits="FloFlyoutButtonTemplate" id="1" />
 			<CheckButton name="$parentButton2" inherits="FloFlyoutButtonTemplate" id="2" />
 			<CheckButton name="$parentButton3" inherits="FloFlyoutButtonTemplate" id="3" />
@@ -283,10 +284,10 @@
 		<CheckedTexture alphaMode="ADD" file="Interface\Buttons\CheckButtonHilight"/>
 	</CheckButton>
 
-	<Button name="FloFlyoutOpenConfig" parent="SpellBookFrame" inherits="UIPanelButtonTemplate" text="FloFlyout">
+	<Button name="FloFlyoutOpenConfig" parent="SpellBookFrame" inherits="UIPanelButtonTemplate" frameStrata="HIGH" text="FloFlyout">
 		<Size x="80" y="22"/>
 		<Anchors>
-			<Anchor point="RIGHT" relativePoint="LEFT" relativeTo="SpellBookFrameCloseButton" x="4" y="1" />
+			<Anchor point="RIGHT" relativePoint="LEFT" relativeTo="SpellBookFrameCloseButton" x="2" y="1" />
 		</Anchors>
 		<Scripts>
 			<OnClick>

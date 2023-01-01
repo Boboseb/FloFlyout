@@ -6,7 +6,7 @@
 -- Constants
 -------------------------------------------------------------------------------
 
-local VERSION = "9.2.16.5"
+local VERSION = "10.0.16"
 local NAME = "FloFlyout"
 local SPELLFLYOUT_DEFAULT_SPACING = 4
 local SPELLFLYOUT_INITIAL_SPACING = 7
@@ -140,8 +140,10 @@ function FloFlyout_OnEvent(self, event, arg1, ...)
 		-- Ici, nous avons rechargé notre configuration
 		FloFlyout.config = FLOFLYOUT_CONFIG
 
-		for _, button in ipairs({FloFlyoutFrame:GetChildren()}) do
-			SecureHandlerWrapScript(button, "OnClick", button, "self:GetParent():Hide()")
+		for i, button in ipairs({FloFlyoutFrame:GetChildren()}) do
+			if button:GetObjectType() == "CheckButton" then
+				SecureHandlerWrapScript(button, "OnClick", button, "self:GetParent():Hide()")
+			end
 		end
 
 		FloFlyoutConfigFlyoutFrame.IsConfig = true
@@ -284,7 +286,7 @@ function FloFlyout:BindFlyoutToAction(idFlyout, idAction)
 		actionBarPage = 2
 		actionButton = _G["ActionButton"..(idAction - 12)]
 	elseif idAction <= 36 then
-		if SHOW_MULTI_ACTIONBAR_3 then
+		if MultiBar3_IsVisible() then
 			actionButton = _G["MultiBarRightButton"..(idAction - 24)]
 			direction = "LEFT"
 		else
@@ -292,7 +294,7 @@ function FloFlyout:BindFlyoutToAction(idFlyout, idAction)
 			actionButton = _G["ActionButton"..(idAction - 24)]
 		end
 	elseif idAction <= 48 then
-		if SHOW_MULTI_ACTIONBAR_4 then
+		if MultiBar4_IsVisible() then
 			actionButton = _G["MultiBarLeftButton"..(idAction - 36)]
 			direction = "RIGHT"
 		else
@@ -300,14 +302,14 @@ function FloFlyout:BindFlyoutToAction(idFlyout, idAction)
 			actionButton = _G["ActionButton"..(idAction - 36)]
 		end
 	elseif idAction <= 60 then
-		if SHOW_MULTI_ACTIONBAR_2 then
+		if MultiBar2_IsVisible() then
 			actionButton = _G["MultiBarBottomRightButton"..(idAction - 48)]
 		else
 			actionBarPage = 5
 			actionButton = _G["ActionButton"..(idAction - 48)]
 		end
 	elseif idAction <= 72 then
-		if SHOW_MULTI_ACTIONBAR_1 then
+		if MultiBar1_IsVisible() then
 			actionButton = _G["MultiBarBottomLeftButton"..(idAction - 60)]
 		else
 			actionBarPage = 6
@@ -356,32 +358,53 @@ end
 local function Opener_UpdateFlyout(self)
 	-- Update border and determine arrow position
 	local arrowDistance;
-	if ((FloFlyoutFrame and FloFlyoutFrame:IsShown() and FloFlyoutFrame:GetParent() == self) or GetMouseFocus() == self) then
-		self.FlyoutBorder:Show();
+	-- Update border
+	local isMouseOverButton =  GetMouseFocus() == self;
+	local isFlyoutShown = FloFlyoutFrame and FloFlyoutFrame:IsShown() and FloFlyoutFrame:GetParent() == self;
+	if isFlyoutShown or isMouseOverButton then
 		self.FlyoutBorderShadow:Show();
 		arrowDistance = 5;
 	else
-		self.FlyoutBorder:Hide();
 		self.FlyoutBorderShadow:Hide();
 		arrowDistance = 2;
 	end
 
 	-- Update arrow
-	self.FlyoutArrow:Show();
-	self.FlyoutArrow:ClearAllPoints();
+	local isButtonDown = self:GetButtonState() == "PUSHED"
+	local flyoutArrowTexture = self.FlyoutArrowContainer.FlyoutArrowNormal
+
+	if isButtonDown then
+		flyoutArrowTexture = self.FlyoutArrowContainer.FlyoutArrowPushed;
+
+		self.FlyoutArrowContainer.FlyoutArrowNormal:Hide();
+		self.FlyoutArrowContainer.FlyoutArrowHighlight:Hide();
+	elseif isMouseOverButton then
+		flyoutArrowTexture = self.FlyoutArrowContainer.FlyoutArrowHighlight;
+
+		self.FlyoutArrowContainer.FlyoutArrowNormal:Hide();
+		self.FlyoutArrowContainer.FlyoutArrowPushed:Hide();
+	else
+		self.FlyoutArrowContainer.FlyoutArrowHighlight:Hide();
+		self.FlyoutArrowContainer.FlyoutArrowPushed:Hide();
+	end
+
+	self.FlyoutArrowContainer:Show();
+	flyoutArrowTexture:Show();
+	flyoutArrowTexture:ClearAllPoints();
+
 	local direction = self:GetAttribute("flyoutDirection");
 	if (direction == "LEFT") then
-		self.FlyoutArrow:SetPoint("LEFT", self, "LEFT", -arrowDistance, 0);
-		SetClampedTextureRotation(self.FlyoutArrow, 270);
+		flyoutArrowTexture:SetPoint("LEFT", self, "LEFT", -arrowDistance, 0);
+		SetClampedTextureRotation(flyoutArrowTexture, 270);
 	elseif (direction == "RIGHT") then
-		self.FlyoutArrow:SetPoint("RIGHT", self, "RIGHT", arrowDistance, 0);
-		SetClampedTextureRotation(self.FlyoutArrow, 90);
+		flyoutArrowTexture:SetPoint("RIGHT", self, "RIGHT", arrowDistance, 0);
+		SetClampedTextureRotation(flyoutArrowTexture, 90);
 	elseif (direction == "DOWN") then
-		self.FlyoutArrow:SetPoint("BOTTOM", self, "BOTTOM", 0, -arrowDistance);
-		SetClampedTextureRotation(self.FlyoutArrow, 180);
+		flyoutArrowTexture:SetPoint("BOTTOM", self, "BOTTOM", 0, -arrowDistance);
+		SetClampedTextureRotation(flyoutArrowTexture, 180);
 	else
-		self.FlyoutArrow:SetPoint("TOP", self, "TOP", 0, arrowDistance);
-		SetClampedTextureRotation(self.FlyoutArrow, 0);
+		flyoutArrowTexture:SetPoint("TOP", self, "TOP", 0, arrowDistance);
+		SetClampedTextureRotation(flyoutArrowTexture, 0);
 	end
 end
 
@@ -390,6 +413,7 @@ local function Opener_PreClick(self, button, down)
 	local spellList = { strsplit(",", self:GetAttribute("spelllist")) }
 	local typeList = { strsplit(",", self:GetAttribute("typelist")) }
 	local buttonList = { FloFlyoutFrame:GetChildren() }
+	table.remove(buttonList, 1)
 	for i, buttonRef in ipairs(buttonList) do
 		if spellList[i] then
 			buttonRef.spellID = spellList[i]
@@ -402,42 +426,56 @@ local function Opener_PreClick(self, button, down)
 			SpellFlyoutButton_UpdateCount(buttonRef)
 		end
 	end
-	FloFlyoutFrame.BgEnd:ClearAllPoints()
+	FloFlyoutFrame.Background.End:ClearAllPoints()
+	FloFlyoutFrame.Background.Start:ClearAllPoints()
 	local distance = 3
-	if direction == "UP" then
-		FloFlyoutFrame.BgEnd:SetPoint("TOP")
-		SetClampedTextureRotation(FloFlyoutFrame.BgEnd, 0)
-		FloFlyoutFrame.HorizBg:Hide()
-		FloFlyoutFrame.VertBg:Show()
-		FloFlyoutFrame.VertBg:ClearAllPoints()
-		FloFlyoutFrame.VertBg:SetPoint("TOP", FloFlyoutFrame.BgEnd, "BOTTOM")
-		FloFlyoutFrame.VertBg:SetPoint("BOTTOM", 0, distance)
-	elseif direction == "DOWN" then
-		FloFlyoutFrame.BgEnd:SetPoint("BOTTOM")
-		SetClampedTextureRotation(FloFlyoutFrame.BgEnd, 180)
-		FloFlyoutFrame.HorizBg:Hide()
-		FloFlyoutFrame.VertBg:Show()
-		FloFlyoutFrame.VertBg:ClearAllPoints()
-		FloFlyoutFrame.VertBg:SetPoint("BOTTOM", self.BgEnd, "TOP")
-		FloFlyoutFrame.VertBg:SetPoint("TOP", 0, -distance)
-	elseif direction == "LEFT" then
-		FloFlyoutFrame.BgEnd:SetPoint("LEFT")
-		SetClampedTextureRotation(FloFlyoutFrame.BgEnd, 270)
-		FloFlyoutFrame.VertBg:Hide()
-		FloFlyoutFrame.HorizBg:Show()
-		FloFlyoutFrame.HorizBg:ClearAllPoints()
-		FloFlyoutFrame.HorizBg:SetPoint("LEFT", FloFlyoutFrame.BgEnd, "RIGHT")
-		FloFlyoutFrame.HorizBg:SetPoint("RIGHT", -distance, 0)
-	elseif direction == "RIGHT" then
-		FloFlyoutFrame.BgEnd:SetPoint("RIGHT")
-		SetClampedTextureRotation(FloFlyoutFrame.BgEnd, 90)
-		FloFlyoutFrame.VertBg:Hide()
-		FloFlyoutFrame.HorizBg:Show()
-		FloFlyoutFrame.HorizBg:ClearAllPoints()
-		FloFlyoutFrame.HorizBg:SetPoint("RIGHT", FloFlyoutFrame.BgEnd, "LEFT")
-		FloFlyoutFrame.HorizBg:SetPoint("LEFT", distance, 0)
+	if (direction == "UP") then
+		FloFlyoutFrame.Background.End:SetPoint("TOP", 0, SPELLFLYOUT_INITIAL_SPACING);
+		SetClampedTextureRotation(FloFlyoutFrame.Background.End, 0);
+		SetClampedTextureRotation(FloFlyoutFrame.Background.VerticalMiddle, 0);
+		FloFlyoutFrame.Background.Start:SetPoint("TOP", FloFlyoutFrame.Background.VerticalMiddle, "BOTTOM");
+		SetClampedTextureRotation(FloFlyoutFrame.Background.Start, 0);
+		FloFlyoutFrame.Background.HorizontalMiddle:Hide();
+		FloFlyoutFrame.Background.VerticalMiddle:Show();
+		FloFlyoutFrame.Background.VerticalMiddle:ClearAllPoints();
+		FloFlyoutFrame.Background.VerticalMiddle:SetPoint("TOP", FloFlyoutFrame.Background.End, "BOTTOM");
+		FloFlyoutFrame.Background.VerticalMiddle:SetPoint("BOTTOM", 0, distance);
+	elseif (direction == "DOWN") then
+		FloFlyoutFrame.Background.End:SetPoint("BOTTOM", 0, -SPELLFLYOUT_INITIAL_SPACING);
+		SetClampedTextureRotation(FloFlyoutFrame.Background.End, 180);
+		SetClampedTextureRotation(FloFlyoutFrame.Background.VerticalMiddle, 180);
+		FloFlyoutFrame.Background.Start:SetPoint("BOTTOM", FloFlyoutFrame.Background.VerticalMiddle, "TOP");
+		SetClampedTextureRotation(FloFlyoutFrame.Background.Start, 180);
+		FloFlyoutFrame.Background.HorizontalMiddle:Hide();
+		FloFlyoutFrame.Background.VerticalMiddle:Show();
+		FloFlyoutFrame.Background.VerticalMiddle:ClearAllPoints();
+		FloFlyoutFrame.Background.VerticalMiddle:SetPoint("BOTTOM", FloFlyoutFrame.Background.End, "TOP");
+		FloFlyoutFrame.Background.VerticalMiddle:SetPoint("TOP", 0, -distance);
+	elseif (direction == "LEFT") then
+		FloFlyoutFrame.Background.End:SetPoint("LEFT", -SPELLFLYOUT_INITIAL_SPACING, 0);
+		SetClampedTextureRotation(FloFlyoutFrame.Background.End, 270);
+		SetClampedTextureRotation(FloFlyoutFrame.Background.HorizontalMiddle, 180);
+		FloFlyoutFrame.Background.Start:SetPoint("LEFT", FloFlyoutFrame.Background.HorizontalMiddle, "RIGHT");
+		SetClampedTextureRotation(FloFlyoutFrame.Background.Start, 270);
+		FloFlyoutFrame.Background.VerticalMiddle:Hide();
+		FloFlyoutFrame.Background.HorizontalMiddle:Show();
+		FloFlyoutFrame.Background.HorizontalMiddle:ClearAllPoints();
+		FloFlyoutFrame.Background.HorizontalMiddle:SetPoint("LEFT", FloFlyoutFrame.Background.End, "RIGHT");
+		FloFlyoutFrame.Background.HorizontalMiddle:SetPoint("RIGHT", -distance, 0);
+	elseif (direction == "RIGHT") then
+		FloFlyoutFrame.Background.End:SetPoint("RIGHT", SPELLFLYOUT_INITIAL_SPACING, 0);
+		SetClampedTextureRotation(FloFlyoutFrame.Background.End, 90);
+		SetClampedTextureRotation(FloFlyoutFrame.Background.HorizontalMiddle, 0);
+		FloFlyoutFrame.Background.Start:SetPoint("RIGHT", FloFlyoutFrame.Background.HorizontalMiddle, "LEFT");
+		SetClampedTextureRotation(FloFlyoutFrame.Background.Start, 90);
+		FloFlyoutFrame.Background.VerticalMiddle:Hide();
+		FloFlyoutFrame.Background.HorizontalMiddle:Show();
+		FloFlyoutFrame.Background.HorizontalMiddle:ClearAllPoints();
+		FloFlyoutFrame.Background.HorizontalMiddle:SetPoint("RIGHT", FloFlyoutFrame.Background.End, "LEFT");
+		FloFlyoutFrame.Background.HorizontalMiddle:SetPoint("LEFT", distance, 0);
 	end
 	FloFlyoutFrame:SetBorderColor(0.7, 0.7, 0.7)
+	FloFlyoutFrame:SetBorderSize(47);
 end
 
 local snippet_Opener_Click = [=[
@@ -463,6 +501,7 @@ local snippet_Opener_Click = [=[
 		local spellList = table.new(strsplit(",", self:GetAttribute("spellnamelist")))
 		local typeList = table.new(strsplit(",", self:GetAttribute("typelist")))
 		local buttonList = table.new(ref:GetChildren())
+		table.remove(buttonList, 1)
 		for i, buttonRef in ipairs(buttonList) do
 			if spellList[i] then
 				buttonRef:ClearAllPoints()
@@ -523,8 +562,20 @@ function FloFlyout:CreateOpener(name, idFlyout, actionId, direction, actionButto
 	opener.flyoutId = idFlyout
 	opener.actionId = actionId
 
-	opener:SetAllPoints(actionButton)
+	if actionButton:IsVisible() then
+		opener:SetAllPoints(actionButton)
+	else
+		local spacerName = "ActionBarButtonSpacer"..tostring(actionButton.index)
+		local children = {actionButton:GetParent():GetChildren()}
+		for _, child in ipairs(children) do
+			if child:GetName() == spacerName then
+				opener:SetAllPoints(child)
+				break;
+			end
+		end
+	end
 	opener:SetFrameStrata("MEDIUM")
+	opener:SetFrameLevel(100)
 	opener:SetToplevel(true)
 
 	opener:SetAttribute("flyoutDirection", direction)
@@ -633,7 +684,7 @@ end
 
 function FloFlyout:AddSpell(flyoutId, actionType, spellId)
 	if type(flyoutId) == "string" then flyoutId = tonumber(flyoutId) end
-	if type(spellId) == "string" then spellId = tonumber(spell) end
+	if type(spellId) == "string" then spellId = tonumber(spellId) end
 	local flyoutConf = self.config.flyouts[flyoutId]
 	table.insert(flyoutConf.spells, spellId)
 	local newPos = #flyoutConf.spells
@@ -721,7 +772,7 @@ function FloFlyoutButton_OnDragStart(self)
 		if mountIndex == nil then
 			PickupSpell(spell)
 		else
-				C_MountJournal.Pickup(mountIndex)
+			C_MountJournal.Pickup(mountIndex)
 		end
 		FloFlyout.mountIndex = mountIndex
 	elseif actionType == "item" then
@@ -871,43 +922,56 @@ function FloFlyoutConfigFlyoutFrame_Update(self, idFlyout)
 
 	local distance = 3
 
-	self.BgEnd:ClearAllPoints()
-	if direction == "UP" then
-		self:SetPoint("BOTTOM", parent, "TOP", 0, 0)
-		self.BgEnd:SetPoint("TOP")
-		SetClampedTextureRotation(self.BgEnd, 0)
-		self.HorizBg:Hide()
-		self.VertBg:Show()
-		self.VertBg:ClearAllPoints()
-		self.VertBg:SetPoint("TOP", self.BgEnd, "BOTTOM")
-		self.VertBg:SetPoint("BOTTOM", 0, distance)
-	elseif direction == "DOWN" then
-		self:SetPoint("TOP", parent, "BOTTOM", 0, 0)
-		self.BgEnd:SetPoint("BOTTOM")
-		SetClampedTextureRotation(self.BgEnd, 180)
-		self.HorizBg:Hide()
-		self.VertBg:Show()
-		self.VertBg:ClearAllPoints()
-		self.VertBg:SetPoint("BOTTOM", self.BgEnd, "TOP")
-		self.VertBg:SetPoint("TOP", 0, -distance)
-	elseif direction == "LEFT" then
-		self:SetPoint("RIGHT", parent, "LEFT", 0, 0)
-		self.BgEnd:SetPoint("LEFT")
-		SetClampedTextureRotation(self.BgEnd, 270)
-		self.VertBg:Hide()
-		self.HorizBg:Show()
-		self.HorizBg:ClearAllPoints()
-		self.HorizBg:SetPoint("LEFT", self.BgEnd, "RIGHT")
-		self.HorizBg:SetPoint("RIGHT", -distance, 0)
-	elseif direction == "RIGHT" then
-		self:SetPoint("LEFT", parent, "RIGHT", 26, 0)
-		self.BgEnd:SetPoint("RIGHT")
-		SetClampedTextureRotation(self.BgEnd, 90)
-		self.VertBg:Hide()
-		self.HorizBg:Show()
-		self.HorizBg:ClearAllPoints()
-		self.HorizBg:SetPoint("RIGHT", self.BgEnd, "LEFT")
-		self.HorizBg:SetPoint("LEFT", distance, 0)
+	self.Background.End:ClearAllPoints()
+	self.Background.Start:ClearAllPoints()
+	if (direction == "UP") then
+		self:SetPoint("BOTTOM", parent, "TOP");
+		self.Background.End:SetPoint("TOP", 0, SPELLFLYOUT_INITIAL_SPACING);
+		SetClampedTextureRotation(self.Background.End, 0);
+		SetClampedTextureRotation(self.Background.VerticalMiddle, 0);
+		self.Background.Start:SetPoint("TOP", self.Background.VerticalMiddle, "BOTTOM");
+		SetClampedTextureRotation(self.Background.Start, 0);
+		self.Background.HorizontalMiddle:Hide();
+		self.Background.VerticalMiddle:Show();
+		self.Background.VerticalMiddle:ClearAllPoints();
+		self.Background.VerticalMiddle:SetPoint("TOP", self.Background.End, "BOTTOM");
+		self.Background.VerticalMiddle:SetPoint("BOTTOM", 0, distance);
+	elseif (direction == "DOWN") then
+		self:SetPoint("TOP", parent, "BOTTOM");
+		self.Background.End:SetPoint("BOTTOM", 0, -SPELLFLYOUT_INITIAL_SPACING);
+		SetClampedTextureRotation(self.Background.End, 180);
+		SetClampedTextureRotation(self.Background.VerticalMiddle, 180);
+		self.Background.Start:SetPoint("BOTTOM", self.Background.VerticalMiddle, "TOP");
+		SetClampedTextureRotation(self.Background.Start, 180);
+		self.Background.HorizontalMiddle:Hide();
+		self.Background.VerticalMiddle:Show();
+		self.Background.VerticalMiddle:ClearAllPoints();
+		self.Background.VerticalMiddle:SetPoint("BOTTOM", self.Background.End, "TOP");
+		self.Background.VerticalMiddle:SetPoint("TOP", 0, -distance);
+	elseif (direction == "LEFT") then
+		self:SetPoint("RIGHT", parent, "LEFT");
+		self.Background.End:SetPoint("LEFT", -SPELLFLYOUT_INITIAL_SPACING, 0);
+		SetClampedTextureRotation(self.Background.End, 270);
+		SetClampedTextureRotation(self.Background.HorizontalMiddle, 180);
+		self.Background.Start:SetPoint("LEFT", self.Background.HorizontalMiddle, "RIGHT");
+		SetClampedTextureRotation(self.Background.Start, 270);
+		self.Background.VerticalMiddle:Hide();
+		self.Background.HorizontalMiddle:Show();
+		self.Background.HorizontalMiddle:ClearAllPoints();
+		self.Background.HorizontalMiddle:SetPoint("LEFT", self.Background.End, "RIGHT");
+		self.Background.HorizontalMiddle:SetPoint("RIGHT", -distance, 0);
+	elseif (direction == "RIGHT") then
+		self:SetPoint("LEFT", parent, "RIGHT");
+		self.Background.End:SetPoint("RIGHT", SPELLFLYOUT_INITIAL_SPACING, 0);
+		SetClampedTextureRotation(self.Background.End, 90);
+		SetClampedTextureRotation(self.Background.HorizontalMiddle, 0);
+		self.Background.Start:SetPoint("RIGHT", self.Background.HorizontalMiddle, "LEFT");
+		SetClampedTextureRotation(self.Background.Start, 90);
+		self.Background.VerticalMiddle:Hide();
+		self.Background.HorizontalMiddle:Show();
+		self.Background.HorizontalMiddle:ClearAllPoints();
+		self.Background.HorizontalMiddle:SetPoint("RIGHT", self.Background.End, "LEFT");
+		self.Background.HorizontalMiddle:SetPoint("LEFT", distance, 0);
 	end
 
 	if direction == "UP" or direction == "DOWN" then
@@ -918,7 +982,9 @@ function FloFlyoutConfigFlyoutFrame_Update(self, idFlyout)
 		self:SetWidth((prevButton:GetWidth()+SPELLFLYOUT_DEFAULT_SPACING) * numButtons - SPELLFLYOUT_DEFAULT_SPACING + SPELLFLYOUT_INITIAL_SPACING + SPELLFLYOUT_FINAL_SPACING)
 	end
 
-	self:SetBorderColor(0.7, 0.7, 0)
+	self.direction = direction;
+	self:SetBorderColor(0.7, 0.7, 0.7);
+	self:SetBorderSize(47);
 end
 
 function FloFlyoutConfigPane_OnLoad(self)

@@ -2,7 +2,7 @@
 ## Title: FloFlyout
 ## Author: Floraline
 ## Notes: Create custom Flyout buttons
-## OptionalDeps:
+## OptionalDeps: ClassicUI
 ## Dependencies:
 ## SavedVariables:
 ## SavedVariablesPerCharacter: FLOFLYOUT_CONFIG

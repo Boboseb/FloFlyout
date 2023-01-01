@@ -17,6 +17,7 @@ local STRIPE_COLOR = {r=0.9, g=0.9, b=1}
 -- Variables
 -------------------------------------------------------------------------------
 local _
+local _classicUI
 
 FLOFLYOUT_CONFIG = {
 	flyouts = {
@@ -89,6 +90,8 @@ function FloFlyout.ReadCmd(line)
 	elseif cmd == "unbind" and tonumber(arg1) then
 		FloFlyout:RemoveAction(arg1)
 		FloFlyout:ApplyConfig()
+	elseif cmd == "apply" then
+		FloFlyout:ApplyConfig()
 	else
 		DEFAULT_CHAT_FRAME:AddMessage(L["USAGE"]);
 		return;
@@ -98,7 +101,7 @@ end
 -- Executed on load, calls general set-up functions
 function FloFlyout_OnLoad(self)
 
-	DEFAULT_CHAT_FRAME:AddMessage( NAME.." "..VERSION.." loaded." )
+	DEFAULT_CHAT_FRAME:AddMessage( "|cffd78900"..NAME.." v"..VERSION.."|r loaded." )
 
 	SLASH_FLOFLYOUT1 = "/floflyout"
 	SLASH_FLOFLYOUT2 = "/ffo"
@@ -125,12 +128,25 @@ function FloFlyout_OnLoad(self)
 	self:RegisterEvent("UPDATE_BINDINGS")
 	self:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
 
+	_classicUI = _G["ClassicUI"]
+	if _classicUI then
+		DEFAULT_CHAT_FRAME:AddMessage( NAME.." : |cffd78900ClassicUI v".._classicUI.VERSION.."|r detected." )
+		local cuipew = _classicUI.MF_PLAYER_ENTERING_WORLD
+		_classicUI.MF_PLAYER_ENTERING_WORLD = function (cui)
+			cuipew(cui)
+			FloFlyout:ApplyConfig()
+		end
+	end
+
 end
 
 function FloFlyout_OnEvent(self, event, arg1, ...)
 
 	if event == "PLAYER_ENTERING_WORLD" --[[or event == "PLAYER_ALIVE"]] then
-		FloFlyout:ApplyConfig()
+
+		if not _classicUI or not _classicUI:IsEnabled() then
+			FloFlyout:ApplyConfig()
+		end
 
 	--elseif event == "SPELL_UPDATE_COOLDOWN" or event == "ACTIONBAR_UPDATE_USABLE" then
 
@@ -275,7 +291,8 @@ end
 
 function FloFlyout:BindFlyoutToAction(idFlyout, idAction)
 
-	local direction, actionButton, actionBarPage, bonusBar
+	local direction, actionButton, actionBarPage, bonusBar, typeActionButton
+	typeActionButton = 0
 	direction = "UP"
 
 	if idAction <= 12 then
@@ -289,6 +306,7 @@ function FloFlyout:BindFlyoutToAction(idFlyout, idAction)
 		if MultiBar3_IsVisible() then
 			actionButton = _G["MultiBarRightButton"..(idAction - 24)]
 			direction = "LEFT"
+			typeActionButton = 2
 		else
 			actionBarPage = 3
 			actionButton = _G["ActionButton"..(idAction - 24)]
@@ -296,7 +314,8 @@ function FloFlyout:BindFlyoutToAction(idFlyout, idAction)
 	elseif idAction <= 48 then
 		if MultiBar4_IsVisible() then
 			actionButton = _G["MultiBarLeftButton"..(idAction - 36)]
-			direction = "RIGHT"
+			direction = "LEFT"
+			typeActionButton = 2
 		else
 			actionBarPage = 4
 			actionButton = _G["ActionButton"..(idAction - 36)]
@@ -304,6 +323,7 @@ function FloFlyout:BindFlyoutToAction(idFlyout, idAction)
 	elseif idAction <= 60 then
 		if MultiBar2_IsVisible() then
 			actionButton = _G["MultiBarBottomRightButton"..(idAction - 48)]
+			typeActionButton = 1
 		else
 			actionBarPage = 5
 			actionButton = _G["ActionButton"..(idAction - 48)]
@@ -311,6 +331,7 @@ function FloFlyout:BindFlyoutToAction(idFlyout, idAction)
 	elseif idAction <= 72 then
 		if MultiBar1_IsVisible() then
 			actionButton = _G["MultiBarBottomLeftButton"..(idAction - 60)]
+			typeActionButton = 1
 		else
 			actionBarPage = 6
 			actionButton = _G["ActionButton"..(idAction - 60)]
@@ -333,7 +354,7 @@ function FloFlyout:BindFlyoutToAction(idFlyout, idAction)
 		actionButton = _G["ActionButton"..(idAction - 108)]
 	end
 
-	FloFlyout:CreateOpener("FloFlyoutOpener"..idAction, idFlyout, idAction, direction, actionButton, actionBarPage, bonusBar)
+	FloFlyout:CreateOpener("FloFlyoutOpener"..idAction, idFlyout, idAction, direction, actionButton, actionBarPage, bonusBar, typeActionButton)
 end
 
 local function Opener_OnReceiveDrag(self)
@@ -409,6 +430,7 @@ local function Opener_UpdateFlyout(self)
 end
 
 local function Opener_PreClick(self, button, down)
+	self:SetChecked(not self:GetChecked())
 	local direction = self:GetAttribute("flyoutDirection");
 	local spellList = { strsplit(",", self:GetAttribute("spelllist")) }
 	local typeList = { strsplit(",", self:GetAttribute("typelist")) }
@@ -554,15 +576,19 @@ local snippet_Opener_Click = [=[
 	end
 ]=]
 
-function FloFlyout:CreateOpener(name, idFlyout, actionId, direction, actionButton, actionBarPage, bonusBar)
+function FloFlyout:CreateOpener(name, idFlyout, actionId, direction, actionButton, actionBarPage, bonusBar, typeActionButton)
 
 	local flyoutConf = self.config.flyouts[idFlyout]
-	local opener = self.openers[name] or CreateFrame("Button", name, UIParent, "ActionButtonTemplate, SecureHandlerClickTemplate")
+	local opener = self.openers[name] or CreateFrame("CheckButton", name, UIParent, "ActionButtonTemplate, SecureHandlerClickTemplate")
 	self.openers[name] = opener
 	opener.flyoutId = idFlyout
 	opener.actionId = actionId
 
-	if actionButton:IsVisible() then
+	if _classicUI then
+		_classicUI.LayoutActionButton(opener, typeActionButton)
+		opener:SetScale(actionButton:GetScale())
+	end
+	if actionButton:GetSize() and actionButton:IsRectValid() then
 		opener:SetAllPoints(actionButton)
 	else
 		local spacerName = "ActionBarButtonSpacer"..tostring(actionButton.index)
@@ -644,7 +670,6 @@ function FloFlyout:ApplyConfig()
 	if InCombatLockdown() then
 		return
 	end
-
 	self:ClearOpeners()
 	for a,f in pairs(self.config.actions[GetSpecialization()]) do
 		self:BindFlyoutToAction(f, a)

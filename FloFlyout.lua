@@ -352,6 +352,22 @@ function FloFlyout:BindFlyoutToAction(idFlyout, idAction)
 		bonusBar = 4
 		actionBarPage = 1
 		actionButton = _G["ActionButton"..(idAction - 108)]
+	elseif idAction <= 132 then
+		bonusBar = 5
+		actionBarPage = 1
+		actionButton = _G["ActionButton"..(idAction - 120)]
+	elseif idAction <= 154 then
+		bonusBar = 6
+		actionBarPage = 1
+		actionButton = _G["ActionButton"..(idAction - 132)]
+	elseif idAction <= 166 then
+		bonusBar = 7
+		actionBarPage = 1
+		actionButton = _G["ActionButton"..(idAction - 154)]
+	elseif idAction <= 178 then
+		bonusBar = 8
+		actionBarPage = 1
+		actionButton = _G["ActionButton"..(idAction - 166)]
 	end
 
 	FloFlyout:CreateOpener("FloFlyoutOpener"..idAction, idFlyout, idAction, direction, actionButton, actionBarPage, bonusBar, typeActionButton)

@@ -445,7 +445,7 @@ local function Opener_PreClick(self, button, down)
 		buttonRef.actionType = typeList[i]
 		local icon = FloFlyout:GetTexture(typeList[i], spellList[i])
 		_G[buttonRef:GetName().."Icon"]:SetTexture(icon)
-		if true or not isEmpty(spellList[i]) then
+		if not isEmpty(spellList[i]) then
 			SpellFlyoutButton_UpdateCooldown(buttonRef)
 			SpellFlyoutButton_UpdateState(buttonRef)
 			SpellFlyoutButton_UpdateUsable(buttonRef)

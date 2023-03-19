@@ -70,6 +70,10 @@ local L = FLOFLYOUT_L10N_STRINGS
 -- Functions
 -------------------------------------------------------------------------------
 
+function isEmpty(s)
+	return s == nil or s == ''
+end
+
 function FloFlyout.ReadCmd(line)
 	local cmd, arg1, arg2 = strsplit(' ', line or "", 3);
 
@@ -228,7 +232,7 @@ function FloFlyoutFrame_OnEvent(self, event, ...)
 	if event == "SPELL_UPDATE_COOLDOWN" then
 		local i = 1
 		local button = _G[self:GetName().."Button"..i]
-		while (button and button:IsShown() and button.spellID) do
+		while (button and button:IsShown() and not isEmpty(button.spellID)) do
 			SpellFlyoutButton_UpdateCooldown(button)
 			i = i+1
 			button = _G[self:GetName().."Button"..i]
@@ -437,11 +441,11 @@ local function Opener_PreClick(self, button, down)
 	local buttonList = { FloFlyoutFrame:GetChildren() }
 	table.remove(buttonList, 1)
 	for i, buttonRef in ipairs(buttonList) do
-		if spellList[i] then
-			buttonRef.spellID = spellList[i]
-			buttonRef.actionType = typeList[i]
-			local icon = FloFlyout:GetTexture(typeList[i], spellList[i])
-			_G[buttonRef:GetName().."Icon"]:SetTexture(icon)
+		buttonRef.spellID = spellList[i]
+		buttonRef.actionType = typeList[i]
+		local icon = FloFlyout:GetTexture(typeList[i], spellList[i])
+		_G[buttonRef:GetName().."Icon"]:SetTexture(icon)
+		if true or not isEmpty(spellList[i]) then
 			SpellFlyoutButton_UpdateCooldown(buttonRef)
 			SpellFlyoutButton_UpdateState(buttonRef)
 			SpellFlyoutButton_UpdateUsable(buttonRef)
@@ -588,15 +592,17 @@ function FloFlyout:CreateOpener(name, idFlyout, actionId, direction, actionButto
 		_classicUI.LayoutActionButton(opener, typeActionButton)
 		opener:SetScale(actionButton:GetScale())
 	end
-	if actionButton:GetSize() and actionButton:IsRectValid() then
-		opener:SetAllPoints(actionButton)
-	else
-		local spacerName = "ActionBarButtonSpacer"..tostring(actionButton.index)
-		local children = {actionButton:GetParent():GetChildren()}
-		for _, child in ipairs(children) do
-			if child:GetName() == spacerName then
-				opener:SetAllPoints(child)
-				break;
+	if actionButton then
+		if actionButton:GetSize() and actionButton:IsRectValid() then
+			opener:SetAllPoints(actionButton)
+		else
+			local spacerName = "ActionBarButtonSpacer"..tostring(actionButton.index)
+			local children = {actionButton:GetParent():GetChildren()}
+			for _, child in ipairs(children) do
+				if child:GetName() == spacerName then
+					opener:SetAllPoints(child)
+					break;
+				end
 			end
 		end
 	end

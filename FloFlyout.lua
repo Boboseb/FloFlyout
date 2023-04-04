@@ -128,6 +128,8 @@ function FloFlyout_OnLoad(self)
 	self:RegisterEvent("UPDATE_BINDINGS")
 	self:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
 
+	EventRegistry:RegisterCallback("ActionBarShownSettingUpdated", function() FloFlyout:ApplyConfig() end  , FloFlyout);
+
 	_classicUI = _G["ClassicUI"]
 	if _classicUI then
 		DEFAULT_CHAT_FRAME:AddMessage( NAME.." : |cffd78900ClassicUI v".._classicUI.VERSION.."|r detected." )

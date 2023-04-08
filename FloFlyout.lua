@@ -127,6 +127,7 @@ function FloFlyout_OnLoad(self)
 	self:RegisterEvent("PLAYER_ALIVE")
 	self:RegisterEvent("UPDATE_BINDINGS")
 	self:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
+	self:RegisterEvent("CURSOR_CHANGED")
 
 	EventRegistry:RegisterCallback("ActionBarShownSettingUpdated", function() FloFlyout:ApplyConfig() end  , FloFlyout);
 
@@ -221,9 +222,45 @@ function FloFlyout_OnEvent(self, event, arg1, ...)
 
 	elseif event == "PLAYER_SPECIALIZATION_CHANGED" then
 		FloFlyout:ApplyConfig()
+
+	elseif event == "CURSOR_CHANGED" then
+		FloFlyout:FixOpenerStrata(arg1, ...)
 	else
 
 	end
+end
+
+function FloFlyout:FixOpenerStrata(isDefault, ...)
+	--local newCursorType, oldCursorType = ...
+	--print("-*-FixOpenerStrata-*- ... isDefault =",isDefault, "newCursorType =", newCursorType,  "oldCursorType =", oldCursorType, "opener = ",opener)
+	if isDefault then
+		self:NormalizeOpenerStrata()
+	else
+		self:ElevateOpenerStrata()
+	end
+end
+
+function FloFlyout:ElevateOpenerStrata()
+	self:ApplyOperationToAllOpenerInstances(function(opener)
+		opener:SetFrameStrata("TOOLTIP")
+	end)
+end
+
+function FloFlyout:NormalizeOpenerStrata()
+	self:ApplyOperationToAllOpenerInstances(function(opener)
+		opener:SetFrameStrata("MEDIUM")
+	end)
+end
+
+function FloFlyout:ApplyOperationToAllOpenerInstances(callback)
+	for btnName, openerObj in pairs(self.openers) do
+		callback(openerObj, btnName)
+	end
+end
+
+function FloFlyout:ApplyOperationToAllOpenerInstancesUnlessInCombat(callback)
+	if InCombatLockdown() then return end
+	self:ApplyOperationToAllOpenerInstances(callback)
 end
 
 function FloFlyoutFrame_OnEvent(self, event, ...)

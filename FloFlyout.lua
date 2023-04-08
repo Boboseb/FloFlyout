@@ -230,9 +230,13 @@ function FloFlyout_OnEvent(self, event, arg1, ...)
 	end
 end
 
+local STRATA_DEFAULT = "MEDIUM"
+local STRATA_MAX = "TOOLTIP"
+
 function FloFlyout:FixOpenerStrata(isDefault, ...)
 	--local newCursorType, oldCursorType = ...
 	--print("-*-FixOpenerStrata-*- ... isDefault =",isDefault, "newCursorType =", newCursorType,  "oldCursorType =", oldCursorType, "opener = ",opener)
+	-- KNOWN BUG: the Bliz CURSOR_CHANGED event lies when you drop a spell on another spell: it reports isDefault==true which is wrong
 	if isDefault then
 		self:NormalizeOpenerStrata()
 	else
@@ -242,13 +246,13 @@ end
 
 function FloFlyout:ElevateOpenerStrata()
 	self:ApplyOperationToAllOpenerInstances(function(opener)
-		opener:SetFrameStrata("TOOLTIP")
+		opener:SetFrameStrata(STRATA_MAX)
 	end)
 end
 
 function FloFlyout:NormalizeOpenerStrata()
 	self:ApplyOperationToAllOpenerInstances(function(opener)
-		opener:SetFrameStrata("MEDIUM")
+		opener:SetFrameStrata(STRATA_DEFAULT)
 	end)
 end
 
@@ -639,7 +643,16 @@ function FloFlyout:CreateOpener(name, idFlyout, actionId, direction, actionButto
 			end
 		end
 	end
-	opener:SetFrameStrata("MEDIUM")
+
+	local strata
+	local thingOnCursor = GetCursorInfo()
+	if thingOnCursor then
+		strata = STRATA_MAX
+	else
+		strata = STRATA_DEFAULT
+	end
+
+	opener:SetFrameStrata(strata)
 	opener:SetFrameLevel(100)
 	opener:SetToplevel(true)
 

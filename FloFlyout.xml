@@ -463,7 +463,7 @@
 				</Layers>
 				<Scripts>
 					<OnVerticalScroll>
-						FauxScrollFrame_OnVerticalScroll(self, offset, GEARSET_ICON_ROW_HEIGHT, FloFlyoutConfigDialogPopup_Update);
+						FauxScrollFrame_OnVerticalScroll(self, offset, 36, FloFlyoutConfigDialogPopup_Update);
 					</OnVerticalScroll>
 				</Scripts>
 			</ScrollFrame>

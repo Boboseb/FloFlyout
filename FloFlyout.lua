@@ -1,6 +1,8 @@
 -- This Source Code Form is subject to the terms of the Mozilla Public
 -- License, v. 2.0. If a copy of the MPL was not distributed with this file,
 -- You can obtain one at http://mozilla.org/MPL/2.0/.
+local MY_NAME, MY_GLOBALS = ...
+local DEBUG = MY_GLOBALS.DEBUG -- my debugging routines that I don't check-in
 
 -------------------------------------------------------------------------------
 -- Constants
@@ -12,6 +14,25 @@ local SPELLFLYOUT_DEFAULT_SPACING = 4
 local SPELLFLYOUT_INITIAL_SPACING = 7
 local SPELLFLYOUT_FINAL_SPACING = 4
 local STRIPE_COLOR = {r=0.9, g=0.9, b=1}
+local STRATA_DEFAULT = "MEDIUM"
+local STRATA_MAX = "TOOLTIP"
+local BLIZ_BAR_METADATA = {
+	[1]  = {name="Action",              visibleIf="bar:1,nobonusbar:1,nobonusbar:2,nobonusbar:3,nobonusbar:4"}, -- primary "ActionBar" - page #1 - no stance/shapeshift --- ff: actionBarPage = 1
+	[2]  = {name="Action",              visibleIf="bar:2"}, -- primary "ActionBar" - page #2 (regardless of stance/shapeshift) --- ff: actionBarPage = 2
+	[3]  = {name="MultiBarRight",       classicType=2}, -- config UI -> Action Bars -> checkbox #4
+	[4]  = {name="MultiBarLeft",        classicType=2}, -- config UI -> Action Bars -> checkbox #5
+	[5]  = {name="MultiBarBottomRight", classicType=1}, -- config UI -> Action Bars -> checkbox #3
+	[6]  = {name="MultiBarBottomLeft",  classicType=1}, -- config UI -> Action Bars -> checkbox #2
+	[7]  = {name="Action",              visibleIf="bar:1,bonusbar:1"}, -- primary "ActionBar" - page #1 - bonusbar 1 - druid CAT
+	[8]  = {name="Action",              visibleIf="bar:1,bonusbar:2"}, -- primary "ActionBar" - page #1 - bonusbar 2 - unknown?
+	[9]  = {name="Action",              visibleIf="bar:1,bonusbar:3"}, -- primary "ActionBar" - page #1 - bonusbar 3 - druid BEAR
+	[10] = {name="Action",              visibleIf="bar:1,bonusbar:4"}, -- primary "ActionBar" - page #1 - bonusbar 4 - druid MOONKIN
+	[11] = {name="Action",              visibleIf="bar:1,bonusbar:5"}, -- primary "ActionBar" - page #1 - bonusbar 5 - dragon riding
+	[12] = {name="Action",              visibleIf="bar:1,bonusbar:6"--[[just a guess]]}, -- unknown?
+	[13] = {name="MultiBar5"}, -- config UI -> Action Bars -> checkbox #6
+	[14] = {name="MultiBar6"}, -- config UI -> Action Bars -> checkbox #7
+	[15] = {name="MultiBar7"}, -- config UI -> Action Bars -> checkbox #8
+}
 
 -------------------------------------------------------------------------------
 -- Variables
@@ -148,7 +169,7 @@ function FloFlyout_OnEvent(self, event, arg1, ...)
 			FloFlyout:ApplyConfig()
 		end
 
-	--elseif event == "SPELL_UPDATE_COOLDOWN" or event == "ACTIONBAR_UPDATE_USABLE" then
+		--elseif event == "SPELL_UPDATE_COOLDOWN" or event == "ACTIONBAR_UPDATE_USABLE" then
 
 	elseif event == "ADDON_LOADED" and arg1 == NAME then
 
@@ -163,7 +184,7 @@ function FloFlyout_OnEvent(self, event, arg1, ...)
 		end
 
 		FloFlyoutConfigFlyoutFrame.IsConfig = true
-		
+
 		for _, flyout in ipairs(FloFlyout.config.flyouts) do
 			if flyout.actionTypes == nil then
 				flyout.actionTypes = {}
@@ -175,7 +196,7 @@ function FloFlyout_OnEvent(self, event, arg1, ...)
 				flyout.mountIndex = {}
 			end
 			if flyout.spellNames == nil then
-					flyout.spellNames = {}
+				flyout.spellNames = {}
 			end
 		end
 
@@ -219,9 +240,15 @@ function FloFlyout_OnEvent(self, event, arg1, ...)
 
 	elseif event == "PLAYER_SPECIALIZATION_CHANGED" then
 		FloFlyout:ApplyConfig()
+
 	else
 
 	end
+end
+
+function FloFlyout:ApplyOperationToAllOpenerInstancesUnlessInCombat(callback)
+	if InCombatLockdown() then return end
+	self:ApplyOperationToAllOpenerInstances(callback)
 end
 
 function FloFlyoutFrame_OnEvent(self, event, ...)
@@ -289,72 +316,29 @@ function FloFlyout:GetName(actionType, data)
 	end
 end
 
-function FloFlyout:BindFlyoutToAction(idFlyout, idAction)
+function FloFlyout:BindFlyoutToAction(ffUniqueId, slotIndex)
+	-- examine the action/bonus/multi bar
+	local barNum = ActionButtonUtil.GetPageForSlot(slotIndex)
+	local blizBarDef = BLIZ_BAR_METADATA[barNum]
+	assert(blizBarDef, "No "..MY_NAME.." config defined for button bar #"..barNum) -- in case Blizzard adds more bars, complain here clearly.
+	local blizBarName = blizBarDef.name
+	local visibleIf = blizBarDef.visibleIf
+	local typeActionButton = blizBarDef.classicType -- for WoW classic
 
-	local direction, actionButton, actionBarPage, bonusBar, typeActionButton
-	typeActionButton = 0
-	direction = "UP"
+	-- examine the button
+	local btnNum = (slotIndex % NUM_ACTIONBAR_BUTTONS)  -- defined in bliz internals ActionButtonUtil.lua
+	if (btnNum == 0) then btnNum = NUM_ACTIONBAR_BUTTONS end -- button #12 divided by 12 is 1 remainder 0.  Thus, treat a 0 as a 12
+	local btnName = blizBarName .. "Button" .. btnNum
+	local btnObj = _G[btnName] -- grab the button object from Blizzard's GLOBAL dumping ground
 
-	if idAction <= 12 then
-		bonusBar = 0
-		actionBarPage = 1
-		actionButton = _G["ActionButton"..idAction]
-	elseif idAction <= 24 then
-		actionBarPage = 2
-		actionButton = _G["ActionButton"..(idAction - 12)]
-	elseif idAction <= 36 then
-		if MultiBar3_IsVisible() then
-			actionButton = _G["MultiBarRightButton"..(idAction - 24)]
-			direction = "LEFT"
-			typeActionButton = 2
-		else
-			actionBarPage = 3
-			actionButton = _G["ActionButton"..(idAction - 24)]
-		end
-	elseif idAction <= 48 then
-		if MultiBar4_IsVisible() then
-			actionButton = _G["MultiBarLeftButton"..(idAction - 36)]
-			direction = "LEFT"
-			typeActionButton = 2
-		else
-			actionBarPage = 4
-			actionButton = _G["ActionButton"..(idAction - 36)]
-		end
-	elseif idAction <= 60 then
-		if MultiBar2_IsVisible() then
-			actionButton = _G["MultiBarBottomRightButton"..(idAction - 48)]
-			typeActionButton = 1
-		else
-			actionBarPage = 5
-			actionButton = _G["ActionButton"..(idAction - 48)]
-		end
-	elseif idAction <= 72 then
-		if MultiBar1_IsVisible() then
-			actionButton = _G["MultiBarBottomLeftButton"..(idAction - 60)]
-			typeActionButton = 1
-		else
-			actionBarPage = 6
-			actionButton = _G["ActionButton"..(idAction - 60)]
-		end
-	elseif idAction <= 84 then
-		bonusBar = 1
-		actionBarPage = 1
-		actionButton = _G["ActionButton"..(idAction - 72)]
-	elseif idAction <= 96 then
-		bonusBar = 2
-		actionBarPage = 1
-		actionButton = _G["ActionButton"..(idAction - 84)]
-	elseif idAction <= 108 then
-		bonusBar = 3
-		actionBarPage = 1
-		actionButton = _G["ActionButton"..(idAction - 96)]
-	elseif idAction <= 120 then
-		bonusBar = 4
-		actionBarPage = 1
-		actionButton = _G["ActionButton"..(idAction - 108)]
-	end
+	-- ask the bar instance what direction to fly
+	local barObj = btnObj and btnObj.bar
+	local direction = barObj and barObj:GetSpellFlyoutDirection() or "UP" -- TODO: fix bug where edit-mode -> change direction doesn't automatically update existing openers
 
-	FloFlyout:CreateOpener("FloFlyoutOpener"..idAction, idFlyout, idAction, direction, actionButton, actionBarPage, bonusBar, typeActionButton)
+	--local foo = btnObj and "FOUND" or "NiL"
+	--print ("###--->>> ffUniqueId =", ffUniqueId, "barNum =",barNum, "slotId = ", slotIndex, "btnObj =",foo, "blizBarName = ",blizBarName,  "btnName =",btnName,  "btnNum =",btnNum, "direction =",direction, "visibleIf =", visibleIf)
+
+	FloFlyout:CreateOpener(slotIndex, ffUniqueId, direction, btnObj, visibleIf, typeActionButton)
 end
 
 local function Opener_OnReceiveDrag(self)
@@ -377,6 +361,7 @@ local function Opener_OnDragStart(self)
 end
 
 local function Opener_UpdateFlyout(self)
+	-- print("========== Opener_UpdateFlyout()") this is being called continuously while a flyout exists on any bar
 	-- Update border and determine arrow position
 	local arrowDistance;
 	-- Update border
@@ -576,10 +561,11 @@ local snippet_Opener_Click = [=[
 	end
 ]=]
 
-function FloFlyout:CreateOpener(name, idFlyout, actionId, direction, actionButton, actionBarPage, bonusBar, typeActionButton)
+function FloFlyout:CreateOpener(actionId, idFlyout, direction, actionButton, visibleIf, typeActionButton)
 
 	local flyoutConf = self.config.flyouts[idFlyout]
-	local opener = self.openers[name] or CreateFrame("CheckButton", name, UIParent, "ActionButtonTemplate, SecureHandlerClickTemplate")
+	local name = "FloFlyoutOpener"..actionId
+	local opener = self.openers[name] or CreateFrame("CheckButton", name, actionButton, "ActionButtonTemplate, SecureHandlerClickTemplate")
 	self.openers[name] = opener
 	opener.flyoutId = idFlyout
 	opener.actionId = actionId
@@ -600,7 +586,8 @@ function FloFlyout:CreateOpener(name, idFlyout, actionId, direction, actionButto
 			end
 		end
 	end
-	opener:SetFrameStrata("MEDIUM")
+
+	opener:SetFrameStrata(STRATA_DEFAULT)
 	opener:SetFrameLevel(100)
 	opener:SetToplevel(true)
 
@@ -641,18 +628,8 @@ function FloFlyout:CreateOpener(name, idFlyout, actionId, direction, actionButto
 		icon:SetTexture(texture)
 	end
 
-	local stateCondition = "nopetbattle,nooverridebar,novehicleui,nopossessbar"
-	if actionBarPage then
-		stateCondition = ",bar:"..actionBarPage
-	end
-	if bonusBar then
-		if bonusBar == 0 then
-			stateCondition = stateCondition..",nobonusbar:1,nobonusbar:2,nobonusbar:3,nobonusbar:4"
-		else
-			stateCondition = stateCondition..",bonusbar:"..bonusBar
-		end
-	end
-	if stateCondition ~= "" then
+	if visibleIf then
+		local stateCondition = "nopetbattle,nooverridebar,novehicleui,nopossessbar," .. visibleIf
 		RegisterStateDriver(opener, "visibility", "["..stateCondition.."] show; hide")
 	else
 		opener:Show()
@@ -852,7 +829,7 @@ function FloFlyoutButton_OnReceiveDrag(self)
 			if oldMountIndex == nil then
 				PickupSpell(oldActionData)
 			else
-					C_MountJournal.Pickup(oldMountIndex)
+				C_MountJournal.Pickup(oldMountIndex)
 			end
 		elseif oldActionType == "item" then
 			PickupItem(oldActionData)
@@ -1075,11 +1052,11 @@ function FloFlyout.ConfigPane_Update()
 					texture = FloFlyout:GetTexture(flyout.actionTypes[1], flyout.spells[1])
 				end
 				if texture then
-                                        if(type(texture) == "number") then
-                                                button.icon:SetTexture(texture);
-                                        else
-                                                button.icon:SetTexture("INTERFACE\\ICONS\\"..texture);
-                                        end
+					if(type(texture) == "number") then
+						button.icon:SetTexture(texture);
+					else
+						button.icon:SetTexture("INTERFACE\\ICONS\\"..texture);
+					end
 				else
 					button.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
 				end
@@ -1124,7 +1101,7 @@ function FloFlyout.ConfigPane_Update()
 				buttons[i].BgBottom:Hide()
 				buttons[i].BgMiddle:SetPoint("BOTTOM")
 			end
-			
+
 			if (i+scrollOffset)%2 == 0 then
 				buttons[i].Stripe:SetTexture(STRIPE_COLOR.r, STRIPE_COLOR.g, STRIPE_COLOR.b)
 				buttons[i].Stripe:SetAlpha(0.1)
@@ -1226,7 +1203,7 @@ function RecalculateFloFlyoutConfigDialogPopup(iconTexture)
 		popup:SetSelection(false, 1)
 	end
 
-	--[[ 
+	--[[
 	Scroll and ensure that any selected equipment shows up in the list.
 	When we first press "save", we want to make sure any selected equipment set shows up in the list, so that
 	the user can just make his changes and press Okay to overwrite.
@@ -1263,7 +1240,7 @@ function RecalculateFloFlyoutConfigDialogPopup(iconTexture)
 end
 
 --[[
-RefreshFlyoutIconInfo() counts how many uniquely textured spells the player has in the current flyout. 
+RefreshFlyoutIconInfo() counts how many uniquely textured spells the player has in the current flyout.
 ]]
 function FloFlyout.RefreshFlyoutIconInfo()
 	FC_ICON_FILENAMES = {}
@@ -1376,7 +1353,7 @@ function FloFlyoutConfigPopupButton_OnClick(self, button, down)
 	local popup = FloFlyoutConfigDialogPopup
 	local offset = FauxScrollFrame_GetOffset(FloFlyoutConfigDialogPopupScrollFrame) or 0
 	popup.selectedIcon = (offset * NUM_FLYOUT_ICONS_PER_ROW) + self:GetID()
- 	popup.selectedTexture = nil
+	popup.selectedTexture = nil
 	FloFlyoutConfigDialogPopup_Update()
 	FloFlyout.ConfigDialogPopupOkay_Update()
 end

@@ -427,7 +427,6 @@ local function Opener_UpdateFlyout_OnUpdate(self, elapsed)
 		return
 	end
 	onUpdateTimer = 0
-	print("=1======== Opener_UpdateFlyout_OnUpdate()")
 	Opener_UpdateFlyout(self)
 end
 

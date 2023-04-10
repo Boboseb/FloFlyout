@@ -429,6 +429,19 @@ local function Opener_UpdateFlyout(self)
 	end
 end
 
+-- throttle OnUpdate because it fires as often as FPS and is very resource intensive
+local ON_UPDATE_TIMER_FREQUENCY = 1.5
+local onUpdateTimer = 0
+local function Opener_UpdateFlyout_OnUpdate(self, elapsed)
+	onUpdateTimer = onUpdateTimer + elapsed
+	if onUpdateTimer < ON_UPDATE_TIMER_FREQUENCY then
+		return
+	end
+	onUpdateTimer = 0
+	print("=1======== Opener_UpdateFlyout_OnUpdate()")
+	Opener_UpdateFlyout(self)
+end
+
 local function Opener_PreClick(self, button, down)
 	self:SetChecked(not self:GetChecked())
 	local direction = self:GetAttribute("flyoutDirection");
@@ -616,7 +629,8 @@ function FloFlyout:CreateOpener(name, idFlyout, actionId, direction, actionButto
 	opener:SetAttribute("spellnamelist", strjoin(",", unpack(flyoutConf.spellNames)))
 	opener:SetAttribute("typelist", strjoin(",", unpack(flyoutConf.actionTypes)))
 
-	opener:SetScript("OnUpdate", Opener_UpdateFlyout)
+	-- TODO: find a way to eliminate the need for OnUpdate
+	opener:SetScript("OnUpdate", Opener_UpdateFlyout_OnUpdate)
 	opener:SetScript("OnEnter", Opener_UpdateFlyout)
 	opener:SetScript("OnLeave", Opener_UpdateFlyout)
 

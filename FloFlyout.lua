@@ -15,6 +15,7 @@ FloFlyout.openers = {} -- copies of flyouts that sit on the action bars
 local VERSION = "10.0.16"
 local NAME = MY_NAME
 local MAX_FLYOUT_SIZE = 20
+local NON_SPEC_SLOT = 5
 local SPELLFLYOUT_DEFAULT_SPACING = 4
 local SPELLFLYOUT_INITIAL_SPACING = 7
 local SPELLFLYOUT_FINAL_SPACING = 4
@@ -46,8 +47,8 @@ local _
 local _classicUI
 local Db = nil -- initialized by Ace in OnInitialize
 
-DEFAULT_FLOFLYOUT_CONFIG = {
-	-- unique flyout definitions shown in the config panel
+-- unique flyout definitions shown in the config panel
+local DEFAULT_FLOFLYOUT_CONFIG = {
 	flyouts = {
 		--[[ Sample config : each flyout can have a list of actions and an icon
 		[1] = {
@@ -66,27 +67,31 @@ DEFAULT_FLOFLYOUT_CONFIG = {
 			},
 			icon = ""
 		},
+		[2] = { ... etc ... }, etc...
 		]]
 	},
-	-- assigned action bar button slots
-	flyoutPlacements = {
-		-- each class spec has its own set of placements
-		[1] = {
-			--[[ Sample config : the bliz action bars have [button slot IDs] on which we can place a flyout ID (see above)
-			[13] = 1,
-			[49] = 1,
-			[25] = 1,
-			]]
-		},
-		[2] = {
-		},
-		[3] = {
-		},
-		[4] = {
-		},
-		[5] = {
-		},
-	}
+}
+
+-- assigned action bar button slots
+local DEFAULT_PLACEMENTS_CONFIG = {
+	-- each class spec has its own set of placements
+	[1] = {
+		-- config format:
+		-- [action bar slot] = flyout Id
+		-- each button on the bliz action bars has a slot ID which is which we place a flyout ID (see above)
+		-- [13] = 1, -- button #13 holds flyout #1
+		-- [49] = 3, -- button #49 holds flyout #3
+		-- [125] = 2, -- button #125 holds flyout #2
+	},
+	[2] = {
+	},
+	[3] = {
+	},
+	[4] = {
+	},
+	-- spec-agnostic slot
+	[5] = {
+	},
 }
 
 -------------------------------------------------------------------------------
@@ -97,15 +102,15 @@ local escMenuConfigDef = {
 	name = MY_NAME,
 	type = "group",
 	args = {
-		enable = {
-			name = "Enable",
-			desc = "Enable / disables the addon",
+		respectSpec = {
+			name = "Swap with spec",
+			desc = "Auto swap flyout locations on the action bars when you change your class spec.",
 			type = "toggle",
 			set = function(info, val)
-				--db.profile.enabled = val
+				Db.profile.respectSpec = val
 			end,
 			get = function()
-				--return db.profile.enabled
+				return Db.profile.respectSpec
 			end
 		},
 		debug = {
@@ -119,13 +124,14 @@ local escMenuConfigDef = {
 				return Db.profile.debug
 			end
 		},
-		profileUi = {} -- will be populated by Ace in OnInitialize()
+		aceProfileUi = {} -- will be populated by Ace in OnInitialize()
 	}
 }
 
 local defaultConfigOptions = {
 	profile = { -- required by AceDB
-		debug = false
+		debug = false,
+		respectSpec = true,
 	}
 }
 
@@ -141,7 +147,7 @@ function FloFlyout:OnInitialize()
 	Db = LibStub("AceDB-3.0"):New("FLOFLYOUT_ACCOUNT_CONFIG", defaultConfigOptions)
 
 	-- grabs Ace's profile management UI def and adds it as another submenu of ours
-	escMenuConfigDef.args.profileUi = LibStub("AceDBOptions-3.0"):GetOptionsTable(Db)
+	escMenuConfigDef.args.aceProfileUi = LibStub("AceDBOptions-3.0"):GetOptionsTable(Db)
 
 	-- Ace-only config registry (required by AceConfigDialog below).  Also adds slash commands {the, stuff, on, the, end}
 	LibStub("AceConfig-3.0"):RegisterOptionsTable(MY_NAME, escMenuConfigDef, { "ff", MY_NAME, string.lower(MY_NAME) })
@@ -154,9 +160,9 @@ function FloFlyout:OnInitialize()
 	Db.RegisterCallback(self, "OnProfileCopied", "HandleConfigChanges")
 	Db.RegisterCallback(self, "OnProfileReset", "HandleConfigChanges")
 
-	self:InitializeConfigDataIfEmpty(true)
-	self:AttachConfigToSelf()
-	self:InitializeFlyoutsGiveThemOnClickHandlers()
+	self:InitializeFlyoutConfigIfEmpty(true)
+	self:InitializePlacementConfigIfEmpty(true)
+	initializeOnClickHandlersForFlyouts()
 end
 
 --[[
@@ -174,39 +180,81 @@ end
 -------------------------------------------------------------------------------
 
 function FloFlyout:HandleConfigChanges()
-	self:InitializeConfigDataIfEmpty()
-	self:AttachConfigToSelf()
+	self:InitializeFlyoutConfigIfEmpty()
+	self:InitializePlacementConfigIfEmpty()
 	self:ApplyConfig()
 end
 
-function FloFlyout:InitializeConfigDataIfEmpty(mayUseLegacyData)
-	if Db.profile.config then
+function FloFlyout:InitializeFlyoutConfigIfEmpty(mayUseLegacyData)
+	if self:GetFlyoutConfig() then
 		return
 	end
 
-	local newConfig
+	local flyouts
 	local legacyData = mayUseLegacyData and FLOFLYOUT_CONFIG
 	if legacyData then
-		newConfig = deepcopy(legacyData)
-		fixLegacyDataNils(newConfig)
-		-- rename the button slots from its legacy name
-		newConfig.flyoutPlacements = newConfig.actions
-		newConfig.actions = nil
+		flyouts = deepcopy(legacyData.flyouts)
+		fixLegacyFlyoutsNils(flyouts)
 	else
-		newConfig = deepcopy(DEFAULT_FLOFLYOUT_CONFIG)
+		flyouts = deepcopy(DEFAULT_FLOFLYOUT_CONFIG)
 	end
 
-	Db.profile.config = newConfig
-
+	Db.profile.flyouts = flyouts
 end
 
--- attach the new config object to the legacy spot so the existing code finds it where it expects.
-function FloFlyout:AttachConfigToSelf()
-	self.flyoutPlacements = Db.profile.config.flyoutPlacements
-	self.flyouts = Db.profile.config.flyouts
+function FloFlyout:InitializePlacementConfigIfEmpty(mayUseLegacyData)
+	if self:GetFlyoutPlacementsForToon() then
+		return
+	end
+
+	local placementsForAllSpecs
+	local legacyData = mayUseLegacyData and FLOFLYOUT_CONFIG
+	if legacyData then
+		placementsForAllSpecs = deepcopy(legacyData.actions)
+		fixLegacyActionsNils(placementsForAllSpecs)
+	else
+		placementsForAllSpecs = deepcopy(DEFAULT_PLACEMENTS_CONFIG)
+	end
+
+	if not Db.profile.placementsPerToonAndSpec then
+		Db.profile.placementsPerToonAndSpec = {}
+	end
+
+	local playerId = getIdForCurrentToon()
+	Db.profile.placementsPerToonAndSpec[playerId] = placementsForAllSpecs
 end
 
-function FloFlyout:InitializeFlyoutsGiveThemOnClickHandlers()
+function FloFlyout:GetFlyoutConfig()
+	return Db.profile.flyouts
+end
+
+function FloFlyout:GetSpecificConditionalFlyoutPlacements()
+	local placements = self:GetFlyoutPlacementsForToon()
+	local spec = self:GetSpecSlotId()
+	return placements and placements[spec]
+end
+
+function FloFlyout:GetFlyoutPlacementsForToon()
+	local playerId = getIdForCurrentToon()
+	local ppts = Db.profile.placementsPerToonAndSpec
+	return ppts and ppts[playerId]
+end
+
+function getIdForCurrentToon()
+	local name, realm = UnitFullName("player") -- FU Bliz, realm is arbitrarily nil sometimes but not always
+	realm = GetRealmName()
+	return name.." - "..realm
+end
+
+function FloFlyout:GetSpecSlotId()
+	if 	Db.profile.respectSpec then
+		return GetSpecialization()
+	else
+		return NON_SPEC_SLOT
+	end
+end
+
+function initializeOnClickHandlersForFlyouts()
 	for i, button in ipairs({FloFlyoutFrame:GetChildren()}) do
 		if button:GetObjectType() == "CheckButton" then
 			SecureHandlerWrapScript(button, "OnClick", button, "self:GetParent():Hide()")
@@ -216,8 +264,8 @@ function FloFlyout:InitializeFlyoutsGiveThemOnClickHandlers()
 	FloFlyoutConfigFlyoutFrame.IsConfig = true
 end
 
-function fixLegacyDataNils(config)
-	for _, flyout in ipairs(config.flyouts) do
+function fixLegacyFlyoutsNils(flyouts)
+	for _, flyout in ipairs(flyouts) do
 		if flyout.actionTypes == nil then
 			flyout.actionTypes = {}
 			for i, _ in ipairs(flyout.spells) do
@@ -231,11 +279,12 @@ function fixLegacyDataNils(config)
 			flyout.spellNames = {}
 		end
 	end
+end
 
-	local flyoutPlacements = config.flyoutPlacements or config.actions
+function fixLegacyActionsNils(actions)
 	for i=3,5 do
-		if flyoutPlacements[i] == nil then
-			flyoutPlacements[i] = {}
+		if actions[i] == nil then
+			actions[i] = {}
 		end
 	end
 end
@@ -324,7 +373,7 @@ function FloFlyout_OnEvent(FloFlyoutListener, event, arg1, ...)
 		local idAction = arg1
 		-- Dans tous les cas, si nous avions un flyout sur cette action, il faut l'enlever de l'action et le mettre dans le curseur
 		local configChanged
-		local oldFlyoutId = FloFlyout.flyoutPlacements[GetSpecialization()][idAction]
+		local oldFlyoutId = FloFlyout:GetSpecificConditionalFlyoutPlacements()[idAction]
 
 		local actionType, id, subType = GetActionInfo(idAction)
 		-- Si actionType vide, c'est sans doute que l'on vient de détruire la macro bidon
@@ -421,11 +470,11 @@ function FloFlyout:GetTexture(actionType, data)
 	end
 end
 
-function FloFlyout:GetName(actionType, data)
+function getItemOrSpellNameById(actionType, id)
 	if actionType == "spell" then
-		return GetSpellInfo(data)
+		return GetSpellInfo(id)
 	elseif actionType == "item" then
-		return GetItemInfo(data)
+		return GetItemInfo(id)
 	elseif actionType == "macro" then
 	end
 end
@@ -455,7 +504,7 @@ function FloFlyout:BindFlyoutToAction(ffUniqueId, slotIndex)
 	FloFlyout:CreateOpener(slotIndex, ffUniqueId, direction, btnObj, visibleIf, typeActionButton)
 end
 
-local function Opener_OnReceiveDrag(self)
+function Opener_OnReceiveDrag(self)
 	if InCombatLockdown() then
 		return
 	end
@@ -466,7 +515,7 @@ local function Opener_OnReceiveDrag(self)
 	end
 end
 
-local function Opener_OnDragStart(self)
+function Opener_OnDragStart(self)
 	if not InCombatLockdown() and (LOCK_ACTIONBAR ~= "1" or IsShiftKeyDown()) then
 		FloFlyout:PickupFlyout(self.flyoutId)
 		FloFlyout:RemoveAction(self.actionId)
@@ -474,7 +523,7 @@ local function Opener_OnDragStart(self)
 	end
 end
 
-local function Opener_UpdateFlyout(self)
+function Opener_UpdateFlyout(self)
 	-- print("========== Opener_UpdateFlyout()") this is being called continuously while a flyout exists on any bar
 	-- Update border and determine arrow position
 	local arrowDistance;
@@ -531,7 +580,7 @@ end
 -- throttle OnUpdate because it fires as often as FPS and is very resource intensive
 local ON_UPDATE_TIMER_FREQUENCY = 1.5
 local onUpdateTimer = 0
-local function Opener_UpdateFlyout_OnUpdate(self, elapsed)
+function Opener_UpdateFlyout_OnUpdate(self, elapsed)
 	onUpdateTimer = onUpdateTimer + elapsed
 	if onUpdateTimer < ON_UPDATE_TIMER_FREQUENCY then
 		return
@@ -540,7 +589,7 @@ local function Opener_UpdateFlyout_OnUpdate(self, elapsed)
 	Opener_UpdateFlyout(self)
 end
 
-local function Opener_PreClick(self, button, down)
+function Opener_PreClick(self, button, down)
 	self:SetChecked(not self:GetChecked())
 	local direction = self:GetAttribute("flyoutDirection");
 	local spellList = { strsplit(",", self:GetAttribute("spelllist")) }
@@ -689,7 +738,7 @@ local snippet_Opener_Click = [=[
 
 function FloFlyout:CreateOpener(actionId, flyoutId, direction, actionButton, visibleIf, typeActionButton)
 
-	local flyoutConf = self.flyouts[flyoutId]
+	local flyoutConf = self.GetFlyoutConfig()[flyoutId]
 	local name = "FloFlyoutOpener"..actionId
 	local opener = self.openers[name] or CreateFrame("CheckButton", name, actionButton, "ActionButtonTemplate, SecureHandlerClickTemplate")
 	self.openers[name] = opener
@@ -777,38 +826,40 @@ function FloFlyout:ApplyConfig()
 		return
 	end
 	self:ClearOpeners()
-	for a,f in pairs(self.flyoutPlacements[GetSpecialization()]) do
+	for a,f in pairs(self:GetSpecificConditionalFlyoutPlacements()) do
 		self:BindFlyoutToAction(f, a)
 	end
 end
 
 function FloFlyout:IsValidFlyoutId(arg1)
 	local id = tonumber(arg1)
-	return id and self.flyouts[id]
+	return id and self.GetFlyoutConfig()[id]
 end
 
 function FloFlyout:IsValidSpellPos(flyoutId, arg2)
 	if type(flyoutId) == "string" then flyoutId = tonumber(flyoutId) end
 	local pos = tonumber(arg2)
-	return pos and self.flyouts[flyoutId].spells[pos]
+	return pos and self.GetFlyoutConfig()[flyoutId].spells[pos]
 end
 
 function FloFlyout:AddFlyout()
 	-- TODO: support macros and battle pets
-	table.insert(self.flyouts, { spells = {}, actionTypes = {}, mountIndex = {}, spellNames = {} })
-	return #self.flyouts
+	table.insert(self.GetFlyoutConfig(), { spells = {}, actionTypes = {}, mountIndex = {}, spellNames = {} })
+	return #self.GetFlyoutConfig()
 end
 
 function FloFlyout:RemoveFlyout(flyoutId)
 	if type(flyoutId) == "string" then flyoutId = tonumber(flyoutId) end
-	table.remove(self.flyouts, flyoutId)
-	-- shift references
-	for i = 1, 3 do
-		for a,f in pairs(self.flyoutPlacements[i]) do
-			if f == flyoutId then
-				self.flyoutPlacements[i][a] = nil
-			elseif f > flyoutId then
-				self.flyoutPlacements[i][a] = f - 1
+	table.remove(self.GetFlyoutConfig(), flyoutId)
+	-- shift references -- TODO: stop this.  Indicees are not a precious resource.  And, this will get really complicated for mixing global & toon
+	local placementsForEachSpec = self:GetFlyoutPlacementsForToon()
+	for i = 1, #placementsForEachSpec do
+		local placements = placementsForEachSpec[i]
+		for slotId, fId in pairs(placements) do
+			if fId == flyoutId then
+				placements[slotId] = nil
+			elseif fId > flyoutId then
+				placements[slotId] = fId - 1
 			end
 		end
 	end
@@ -817,7 +868,7 @@ end
 function FloFlyout:AddSpell(flyoutId, actionType, spellId)
 	if type(flyoutId) == "string" then flyoutId = tonumber(flyoutId) end
 	if type(spellId) == "string" then spellId = tonumber(spellId) end
-	local flyoutConf = self.flyouts[flyoutId]
+	local flyoutConf = self.GetFlyoutConfig()[flyoutId]
 	table.insert(flyoutConf.spells, spellId)
 	local newPos = #flyoutConf.spells
 	flyoutConf.actionTypes[newPos] = actionType
@@ -827,7 +878,7 @@ end
 function FloFlyout:RemoveSpell(flyoutId, spellPos)
 	if type(flyoutId) == "string" then flyoutId = tonumber(flyoutId) end
 	if type(spellPos) == "string" then spellPos = tonumber(spellPos) end
-	local flyoutConf = self.flyouts[flyoutId]
+	local flyoutConf = self.GetFlyoutConfig()[flyoutId]
 	-- TODO: support macros and battle pets
 	table.remove(flyoutConf.spells, spellPos)
 	table.remove(flyoutConf.actionTypes, spellPos)
@@ -835,15 +886,15 @@ function FloFlyout:RemoveSpell(flyoutId, spellPos)
 	table.remove(flyoutConf.spellNames, spellPos)
 end
 
-function FloFlyout:AddAction(actionId, flyoutId)
-	if type(actionId) == "string" then actionId = tonumber(actionId) end
+function FloFlyout:AddAction(slotId, flyoutId)
+	if type(slotId) == "string" then slotId = tonumber(slotId) end
 	if type(flyoutId) == "string" then flyoutId = tonumber(flyoutId) end
-	self.flyoutPlacements[GetSpecialization()][actionId] = flyoutId
+	self:GetSpecificConditionalFlyoutPlacements()[slotId] = flyoutId
 end
 
-function FloFlyout:RemoveAction(actionId)
-	if type(actionId) == "string" then actionId = tonumber(actionId) end
-	self.flyoutPlacements[GetSpecialization()][actionId] = nil
+function FloFlyout:RemoveAction(slotId)
+	if type(slotId) == "string" then slotId = tonumber(slotId) end
+	self:GetSpecificConditionalFlyoutPlacements()[slotId] = nil
 end
 
 function FloFlyout:PickupFlyout(flyoutId)
@@ -852,7 +903,7 @@ function FloFlyout:PickupFlyout(flyoutId)
 		return;
 	end
 
-	local flyoutConf = self.flyouts[flyoutId]
+	local flyoutConf = self.GetFlyoutConfig()[flyoutId]
 	local texture = flyoutConf.icon
 
 	if not texture and flyoutConf.spells[1] then
@@ -890,7 +941,7 @@ function FloFlyoutButton_SetTooltip(self)
 		else
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		end
-		local spellName = FloFlyout:GetName(self.actionType, self.spellID)
+		local spellName = getItemOrSpellNameById(self.actionType, self.spellID)
 		GameTooltip:SetText(spellName, HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b)
 		self.UpdateTooltip = nil
 	end
@@ -951,7 +1002,7 @@ function FloFlyoutButton_OnReceiveDrag(self)
 		actionData = info1
 	end
 	if actionType then
-		local flyoutConf = FloFlyout.flyouts[parent.idFlyout]
+		local flyoutConf = FloFlyout:GetFlyoutConfig()[parent.idFlyout]
 		local oldActionData = flyoutConf.spells[self:GetID()]
 		local oldActionType = flyoutConf.actionTypes[self:GetID()]
 		local oldMountIndex = flyoutConf.mountIndex[self:GetID()]
@@ -959,7 +1010,7 @@ function FloFlyoutButton_OnReceiveDrag(self)
 		flyoutConf.spells[self:GetID()] = actionData
 		flyoutConf.actionTypes[self:GetID()] = actionType
 		flyoutConf.mountIndex[self:GetID()] = mountIndex
-		flyoutConf.spellNames[self:GetID()] = FloFlyout:GetName(flyoutConf.actionTypes[i], actionData)
+		flyoutConf.spellNames[self:GetID()] = getItemOrSpellNameById(flyoutConf.actionTypes[i], actionData)
 		ClearCursor()
 		FloFlyout:ApplyConfig()
 		FloFlyoutConfigFlyoutFrame_Update(parent, parent.idFlyout)
@@ -985,11 +1036,11 @@ function FloFlyoutConfigFlyoutFrame_Update(self, idFlyout)
 	-- Update all spell buttons for this flyout
 	local prevButton = nil;
 	local numButtons = 0;
-	local spells = FloFlyout.flyouts[idFlyout].spells
-	local actionTypes = FloFlyout.flyouts[idFlyout].actionTypes
-	local mountIndexes = FloFlyout.flyouts[idFlyout].mountIndex
+	local spells = FloFlyout:GetFlyoutConfig()[idFlyout].spells
+	local actionTypes = FloFlyout:GetFlyoutConfig()[idFlyout].actionTypes
+	local mountIndexes = FloFlyout:GetFlyoutConfig()[idFlyout].mountIndex
 
-	for i=1, math.min(#spells+1, MAX_FLYOUT_SIZE) do --
+	for i=1, math.min(#spells+1, MAX_FLYOUT_SIZE) do
 		local spellID = spells[i]
 		local actionType = actionTypes[i]
 		local mountIndex = mountIndexes[i]
@@ -1166,7 +1217,8 @@ function FloFlyoutConfigPane_OnUpdate(self)
 end
 
 function FloFlyout.ConfigPane_Update()
-	local numRows = #FloFlyout.flyouts + 1
+	local flyouts = FloFlyout:GetFlyoutConfig()
+	local numRows = #flyouts + 1
 	HybridScrollFrame_Update(FloFlyoutConfigPane, numRows * EQUIPMENTSET_BUTTON_HEIGHT + 20, FloFlyoutConfigPane:GetHeight())
 
 	local scrollOffset = HybridScrollFrame_GetOffset(FloFlyoutConfigPane)
@@ -1185,7 +1237,7 @@ function FloFlyout.ConfigPane_Update()
 				button.name = i+scrollOffset
 				button.text:SetText(button.name);
 				button.text:SetTextColor(NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b);
-				flyout = FloFlyout.flyouts[i+scrollOffset]
+				flyout = FloFlyout:GetFlyoutConfig()[i+scrollOffset]
 				texture = flyout.icon
 
 				if not texture and flyout.spells[1] then
@@ -1389,8 +1441,8 @@ function FloFlyout.RefreshFlyoutIconInfo()
 
 	local popup = FloFlyoutConfigDialogPopup
 	if popup.name then
-		local spells = FloFlyout.flyouts[popup.name].spells
-		local actionTypes = FloFlyout.flyouts[popup.name].actionTypes
+		local spells = FloFlyout:GetFlyoutConfig()[popup.name].spells
+		local actionTypes = FloFlyout:GetFlyoutConfig()[popup.name].actionTypes
 		for i = 1, #spells do
 			local itemTexture = FloFlyout:GetTexture(actionTypes[i], spells[i])
 			if itemTexture then
@@ -1475,10 +1527,10 @@ function FloFlyoutConfigDialogPopupOkay_OnClick(self, button, pushed)
 
 	if popup.isEdit then
 		-- Modifying a flyout
-		FloFlyout.flyouts[popup.name].icon = iconTexture
+		FloFlyout:GetFlyoutConfig()[popup.name].icon = iconTexture
 	else
 		-- Saving a new flyout
-		FloFlyout.flyouts[FloFlyout:AddFlyout()].icon = iconTexture
+		FloFlyout:GetFlyoutConfig()[FloFlyout:AddFlyout()].icon = iconTexture
 	end
 	popup:Hide()
 	FloFlyout.ConfigPane_Update()

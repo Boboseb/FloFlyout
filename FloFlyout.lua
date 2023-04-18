@@ -14,7 +14,7 @@ FloFlyout.openers = {} -- copies of flyouts that sit on the action bars
 
 local VERSION = "10.0.16"
 local NAME = MY_NAME
-local MAX_FLYOUT_SIZE = 10
+local MAX_FLYOUT_SIZE = 20
 local SPELLFLYOUT_DEFAULT_SPACING = 4
 local SPELLFLYOUT_INITIAL_SPACING = 7
 local SPELLFLYOUT_FINAL_SPACING = 4
@@ -989,7 +989,7 @@ function FloFlyoutConfigFlyoutFrame_Update(self, idFlyout)
 	local actionTypes = FloFlyout.flyouts[idFlyout].actionTypes
 	local mountIndexes = FloFlyout.flyouts[idFlyout].mountIndex
 
-	for i=1, math.min(#spells+1, MAX_FLYOUT_SIZE) do
+	for i=1, math.min(#spells+1, MAX_FLYOUT_SIZE) do --
 		local spellID = spells[i]
 		local actionType = actionTypes[i]
 		local mountIndex = mountIndexes[i]

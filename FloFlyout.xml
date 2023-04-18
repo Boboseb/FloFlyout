@@ -75,6 +75,16 @@
 			<CheckButton name="$parentButton8" inherits="FloFlyoutButtonTemplate" id="8" />
 			<CheckButton name="$parentButton9" inherits="FloFlyoutButtonTemplate" id="9" />
 			<CheckButton name="$parentButton10" inherits="FloFlyoutButtonTemplate" id="10" />
+			<CheckButton name="$parentButton11" inherits="FloFlyoutButtonTemplate" id="11" />
+			<CheckButton name="$parentButton12" inherits="FloFlyoutButtonTemplate" id="12" />
+			<CheckButton name="$parentButton13" inherits="FloFlyoutButtonTemplate" id="13" />
+			<CheckButton name="$parentButton14" inherits="FloFlyoutButtonTemplate" id="14" />
+			<CheckButton name="$parentButton15" inherits="FloFlyoutButtonTemplate" id="15" />
+			<CheckButton name="$parentButton16" inherits="FloFlyoutButtonTemplate" id="16" />
+			<CheckButton name="$parentButton17" inherits="FloFlyoutButtonTemplate" id="17" />
+			<CheckButton name="$parentButton18" inherits="FloFlyoutButtonTemplate" id="18" />
+			<CheckButton name="$parentButton19" inherits="FloFlyoutButtonTemplate" id="19" />
+			<CheckButton name="$parentButton20" inherits="FloFlyoutButtonTemplate" id="20" />
 		</Frames>
 		<Scripts>
 			<OnLoad function="SpellFlyout_OnLoad"/>

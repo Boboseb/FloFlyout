@@ -479,6 +479,21 @@ function getItemOrSpellNameById(actionType, id)
 	end
 end
 
+function isItemOrSpellUsable(id, actionType, mountId)
+	if mountId then
+		-- TODO: figure out how to find a mount
+		return true -- GetMountInfoByID(mountId)
+	elseif actionType == "spell" then
+		return IsSpellKnown(id)
+	elseif  actionType == "item" then
+		local n = GetItemCount(id)
+		local t = PlayerHasToy(id) -- TODO: update the config code so it sets actionType = toy
+		return t or n > 0
+	elseif actionType == "macro" then
+	end
+end
+
+
 function FloFlyout:BindFlyoutToAction(ffUniqueId, slotIndex)
 	-- examine the action/bonus/multi bar
 	local barNum = ActionButtonUtil.GetPageForSlot(slotIndex)
@@ -770,15 +785,41 @@ function FloFlyout:CreateOpener(actionId, flyoutId, direction, actionButton, vis
 
 	opener:SetAttribute("flyoutDirection", direction)
 	opener:SetFrameRef("FloFlyoutFrame", FloFlyoutFrame)
-	opener:SetAttribute("spelllist", strjoin(",", unpack(flyoutConf.spells)))
-	local spellnameList = flyoutConf.spellNames
+
 	for i, spellID in ipairs(flyoutConf.spells) do
-		if spellnameList[i] == nil then
-			spellnameList[i] = self:GetName(flyoutConf.actionTypes[i], spellID)
+		if flyoutConf.spellNames[i] == nil then
+			flyoutConf.spellNames[i] = getItemOrSpellNameById(flyoutConf.actionTypes[i], spellID)
 		end
 	end
-	opener:SetAttribute("spellnamelist", strjoin(",", unpack(flyoutConf.spellNames)))
-	opener:SetAttribute("typelist", strjoin(",", unpack(flyoutConf.actionTypes)))
+
+	-- TODO: skip over spells / items that are unknown, unowned, unusable, etc.
+
+	local spells = {}
+	local spellNames = {}
+	local actionTypes = {}
+	for i, spellID in ipairs(flyoutConf.spells) do
+		if isItemOrSpellUsable(spellID, flyoutConf.actionTypes[i], flyoutConf.mountIndex[i]) then
+			table.insert(spells, flyoutConf.spells[i])
+			table.insert(spellNames, flyoutConf.spellNames[i])
+			table.insert(actionTypes, flyoutConf.actionTypes[i])
+		end
+	end
+	opener:SetAttribute("spelllist", strjoin(",", unpack(spells)))
+	opener:SetAttribute("spellnamelist", strjoin(",", unpack(spellNames)))
+	opener:SetAttribute("typelist", strjoin(",", unpack(actionTypes)))
+
+
+	--[[
+        opener:SetAttribute("spelllist", strjoin(",", unpack(flyoutConf.spells)))
+        local spellnameList = flyoutConf.spellNames
+        for i, spellID in ipairs(flyoutConf.spells) do
+            if spellnameList[i] == nil then
+                spellnameList[i] = getItemOrSpellNameById(flyoutConf.actionTypes[i], spellID)
+            end
+        end
+        opener:SetAttribute("spellnamelist", strjoin(",", unpack(flyoutConf.spellNames)))
+        opener:SetAttribute("typelist", strjoin(",", unpack(flyoutConf.actionTypes)))
+    ]]
 
 	-- TODO: find a way to eliminate the need for OnUpdate
 	opener:SetScript("OnUpdate", Opener_UpdateFlyout_OnUpdate)
@@ -988,13 +1029,14 @@ function FloFlyoutButton_OnReceiveDrag(self)
 	local kind, info1, info2, info3 = GetCursorInfo()
 	local actionType, actionData, mountIndex
 
-	-- support battle pets and macros
+	-- TODO: distinguish between toys and spells
+	-- TODO: support battle pets and macros
 	--print("FloFlyoutButton_OnReceiveDrag-->  kind =",kind, " --  info1 =",info1, " --  info1 =",info1, " --  info3 =",info3)
 	if kind == "spell" then
 		actionType = "spell"
 		actionData = info3
 	elseif kind == "mount" then
-		actionType = "spell"
+		actionType = "spell" -- TODO: Hurm
 		_, actionData, _, _, _, _, _, _, _, _, _ = C_MountJournal.GetDisplayedMountInfo(FloFlyout.mountIndex);
 		mountIndex = FloFlyout.mountIndex
 	elseif kind == "item" then

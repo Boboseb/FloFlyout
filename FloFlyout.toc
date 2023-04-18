@@ -4,6 +4,8 @@
 ## Notes: Create custom Flyout buttons
 ## OptionalDeps: ClassicUI
 ## Dependencies:
-## SavedVariables:
+## SavedVariables: FLOFLYOUT_ACCOUNT_CONFIG
 ## SavedVariablesPerCharacter: FLOFLYOUT_CONFIG
+## Comment: SavedVariablesPerCharacter only exists for legacy support
+embeds.xml
 FloFlyout.xml

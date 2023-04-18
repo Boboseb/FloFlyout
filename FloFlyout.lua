@@ -1,15 +1,20 @@
 -- This Source Code Form is subject to the terms of the Mozilla Public
 -- License, v. 2.0. If a copy of the MPL was not distributed with this file,
 -- You can obtain one at http://mozilla.org/MPL/2.0/.
+
 local MY_NAME, MY_GLOBALS = ...
-local DEBUG = MY_GLOBALS.DEBUG -- my debugging routines that I don't check-in
+local L = FLOFLYOUT_L10N_STRINGS -- auto loaded from locales directory
+
+FloFlyout = LibStub("AceAddon-3.0"):NewAddon(MY_NAME, "AceConsole-3.0", "AceEvent-3.0", "AceHook-3.0")
+FloFlyout.openers = {} -- copies of flyouts that sit on the action bars
 
 -------------------------------------------------------------------------------
 -- Constants
 -------------------------------------------------------------------------------
 
 local VERSION = "10.0.16"
-local NAME = "FloFlyout"
+local NAME = MY_NAME
+local MAX_FLYOUT_SIZE = 10
 local SPELLFLYOUT_DEFAULT_SPACING = 4
 local SPELLFLYOUT_INITIAL_SPACING = 7
 local SPELLFLYOUT_FINAL_SPACING = 4
@@ -39,8 +44,10 @@ local BLIZ_BAR_METADATA = {
 -------------------------------------------------------------------------------
 local _
 local _classicUI
+local Db = nil -- initialized by Ace in OnInitialize
 
-FLOFLYOUT_CONFIG = {
+DEFAULT_FLOFLYOUT_CONFIG = {
+	-- unique flyout definitions shown in the config panel
 	flyouts = {
 		--[[ Sample config : each flyout can have a list of actions and an icon
 		[1] = {
@@ -61,9 +68,11 @@ FLOFLYOUT_CONFIG = {
 		},
 		]]
 	},
-	actions = {
+	-- assigned action bar button slots
+	flyoutPlacements = {
+		-- each class spec has its own set of placements
 		[1] = {
-			--[[ Sample config : for each talent group there is a list of actions bound to flyouts
+			--[[ Sample config : the bliz action bars have [button slot IDs] on which we can place a flyout ID (see above)
 			[13] = 1,
 			[49] = 1,
 			[25] = 1,
@@ -80,19 +89,155 @@ FLOFLYOUT_CONFIG = {
 	}
 }
 
-local FloFlyout = {
-	openers = {},
-	config = FLOFLYOUT_CONFIG
+-------------------------------------------------------------------------------
+-- Ace -> Bliz Config UI definition
+-------------------------------------------------------------------------------
+
+local escMenuConfigDef = {
+	name = MY_NAME,
+	type = "group",
+	args = {
+		enable = {
+			name = "Enable",
+			desc = "Enable / disables the addon",
+			type = "toggle",
+			set = function(info, val)
+				--db.profile.enabled = val
+			end,
+			get = function()
+				--return db.profile.enabled
+			end
+		},
+		debug = {
+			name = "Show debug info",
+			desc = "Enable / disable debug information",
+			type = "toggle",
+			set = function(info, val)
+				Db.profile.debug = val
+			end,
+			get = function()
+				return Db.profile.debug
+			end
+		},
+		profileUi = {} -- will be populated by Ace in OnInitialize()
+	}
 }
 
-local L = FLOFLYOUT_L10N_STRINGS
+local defaultConfigOptions = {
+	profile = { -- required by AceDB
+		debug = false
+	}
+}
 
 -------------------------------------------------------------------------------
--- Functions
+-- Ace Addon lifecycle
 -------------------------------------------------------------------------------
 
-function isEmpty(s)
-	return s == nil or s == ''
+-- called by Ace directly after the addon is fully loaded
+function FloFlyout:OnInitialize()
+	print("FloFlyout:OnInitialize() aces!")
+
+	-- AceDB manages SavedVariables and adds profile management -- must match the .toc ## SavedVariables
+	Db = LibStub("AceDB-3.0"):New("FLOFLYOUT_ACCOUNT_CONFIG", defaultConfigOptions)
+
+	-- grabs Ace's profile management UI def and adds it as another submenu of ours
+	escMenuConfigDef.args.profileUi = LibStub("AceDBOptions-3.0"):GetOptionsTable(Db)
+
+	-- Ace-only config registry (required by AceConfigDialog below).  Also adds slash commands {the, stuff, on, the, end}
+	LibStub("AceConfig-3.0"):RegisterOptionsTable(MY_NAME, escMenuConfigDef, { "ff", MY_NAME, string.lower(MY_NAME) })
+
+	-- inserts our custom config into the Bliz addon config UI
+	LibStub("AceConfigDialog-3.0"):AddToBlizOptions(MY_NAME)
+
+	-- if the user switches to a different profile in the addon config options
+	Db.RegisterCallback(self, "OnProfileChanged", "HandleConfigChanges")
+	Db.RegisterCallback(self, "OnProfileCopied", "HandleConfigChanges")
+	Db.RegisterCallback(self, "OnProfileReset", "HandleConfigChanges")
+
+	self:InitializeConfigDataIfEmpty(true)
+	self:AttachConfigToSelf()
+	self:InitializeFlyoutsGiveThemOnClickHandlers()
+end
+
+--[[
+-- called by Ace during the PLAYER_LOGIN event, when most of the data provided by the game is already present
+function FloFlyoutAce:OnEnable()
+end
+
+-- called by Ace only when your addon is manually being disabled
+function FloFlyoutAce:OnDisable()
+end
+]]
+
+-------------------------------------------------------------------------------
+-- FloFlyout Methods
+-------------------------------------------------------------------------------
+
+function FloFlyout:HandleConfigChanges()
+	self:InitializeConfigDataIfEmpty()
+	self:AttachConfigToSelf()
+	self:ApplyConfig()
+end
+
+function FloFlyout:InitializeConfigDataIfEmpty(mayUseLegacyData)
+	if Db.profile.config then
+		return
+	end
+
+	local newConfig
+	local legacyData = mayUseLegacyData and FLOFLYOUT_CONFIG
+	if legacyData then
+		newConfig = deepcopy(legacyData)
+		fixLegacyDataNils(newConfig)
+		-- rename the button slots from its legacy name
+		newConfig.flyoutPlacements = newConfig.actions
+		newConfig.actions = nil
+	else
+		newConfig = deepcopy(DEFAULT_FLOFLYOUT_CONFIG)
+	end
+
+	Db.profile.config = newConfig
+
+end
+
+-- attach the new config object to the legacy spot so the existing code finds it where it expects.
+function FloFlyout:AttachConfigToSelf()
+	self.flyoutPlacements = Db.profile.config.flyoutPlacements
+	self.flyouts = Db.profile.config.flyouts
+end
+
+function FloFlyout:InitializeFlyoutsGiveThemOnClickHandlers()
+	for i, button in ipairs({FloFlyoutFrame:GetChildren()}) do
+		if button:GetObjectType() == "CheckButton" then
+			SecureHandlerWrapScript(button, "OnClick", button, "self:GetParent():Hide()")
+		end
+	end
+
+	FloFlyoutConfigFlyoutFrame.IsConfig = true
+end
+
+function fixLegacyDataNils(config)
+	for _, flyout in ipairs(config.flyouts) do
+		if flyout.actionTypes == nil then
+			flyout.actionTypes = {}
+			for i, _ in ipairs(flyout.spells) do
+				flyout.actionTypes[i] = "spell"
+			end
+		end
+		if flyout.mountIndex == nil then
+			flyout.mountIndex = {}
+		end
+		if flyout.spellNames == nil then
+			flyout.spellNames = {}
+		end
+	end
+
+	local flyoutPlacements = config.flyoutPlacements or config.actions
+	for i=3,5 do
+		if flyoutPlacements[i] == nil then
+			flyoutPlacements[i] = {}
+		end
+	end
 end
 
 function FloFlyout.ReadCmd(line)
@@ -144,7 +289,7 @@ function FloFlyout_OnLoad(self)
 		whileDead = 1,
 	}
 
-	self:RegisterEvent("ADDON_LOADED")
+	-- self:RegisterEvent("ADDON_LOADED") -- replaced with Ace
 	self:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
 	--self:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED")
 
@@ -165,7 +310,7 @@ function FloFlyout_OnLoad(self)
 
 end
 
-function FloFlyout_OnEvent(self, event, arg1, ...)
+function FloFlyout_OnEvent(FloFlyoutListener, event, arg1, ...)
 
 	if event == "PLAYER_ENTERING_WORLD" --[[or event == "PLAYER_ALIVE"]] then
 
@@ -175,46 +320,11 @@ function FloFlyout_OnEvent(self, event, arg1, ...)
 
 		--elseif event == "SPELL_UPDATE_COOLDOWN" or event == "ACTIONBAR_UPDATE_USABLE" then
 
-	elseif event == "ADDON_LOADED" and arg1 == NAME then
-
-		self:UnregisterEvent("ADDON_LOADED")
-		-- Ici, nous avons rechargé notre configuration
-		FloFlyout.config = FLOFLYOUT_CONFIG
-
-		for i, button in ipairs({FloFlyoutFrame:GetChildren()}) do
-			if button:GetObjectType() == "CheckButton" then
-				SecureHandlerWrapScript(button, "OnClick", button, "self:GetParent():Hide()")
-			end
-		end
-
-		FloFlyoutConfigFlyoutFrame.IsConfig = true
-
-		for _, flyout in ipairs(FloFlyout.config.flyouts) do
-			if flyout.actionTypes == nil then
-				flyout.actionTypes = {}
-				for i, _ in ipairs(flyout.spells) do
-					flyout.actionTypes[i] = "spell"
-				end
-			end
-			if flyout.mountIndex == nil then
-				flyout.mountIndex = {}
-			end
-			if flyout.spellNames == nil then
-				flyout.spellNames = {}
-			end
-		end
-
-		for i=3,5 do
-			if FloFlyout.config.actions[i] == nil then
-				FloFlyout.config.actions[i] = {}
-			end
-		end
-
 	elseif event == "ACTIONBAR_SLOT_CHANGED" then
 		local idAction = arg1
 		-- Dans tous les cas, si nous avions un flyout sur cette action, il faut l'enlever de l'action et le mettre dans le curseur
 		local configChanged
-		local oldFlyoutId = FloFlyout.config.actions[GetSpecialization()][idAction]
+		local oldFlyoutId = FloFlyout.flyoutPlacements[GetSpecialization()][idAction]
 
 		local actionType, id, subType = GetActionInfo(idAction)
 		-- Si actionType vide, c'est sans doute que l'on vient de détruire la macro bidon
@@ -577,13 +687,13 @@ local snippet_Opener_Click = [=[
 	end
 ]=]
 
-function FloFlyout:CreateOpener(actionId, idFlyout, direction, actionButton, visibleIf, typeActionButton)
+function FloFlyout:CreateOpener(actionId, flyoutId, direction, actionButton, visibleIf, typeActionButton)
 
-	local flyoutConf = self.config.flyouts[idFlyout]
+	local flyoutConf = self.flyouts[flyoutId]
 	local name = "FloFlyoutOpener"..actionId
 	local opener = self.openers[name] or CreateFrame("CheckButton", name, actionButton, "ActionButtonTemplate, SecureHandlerClickTemplate")
 	self.openers[name] = opener
-	opener.flyoutId = idFlyout
+	opener.flyoutId = flyoutId
 	opener.actionId = actionId
 
 	if _classicUI then
@@ -627,7 +737,7 @@ function FloFlyout:CreateOpener(actionId, idFlyout, direction, actionButton, vis
 	opener:SetScript("OnLeave", Opener_UpdateFlyout)
 
 	opener:SetScript("OnReceiveDrag", Opener_OnReceiveDrag)
-	opener:SetScript("OnMouseUp", Opener_OnReceiveDrag)
+	opener:SetScript("OnMouseUp", Opener_OnReceiveDrag) -- Hmmm... needed?
 	opener:SetScript("OnDragStart", Opener_OnDragStart)
 
 	opener:SetScript("PreClick", Opener_PreClick)
@@ -667,37 +777,38 @@ function FloFlyout:ApplyConfig()
 		return
 	end
 	self:ClearOpeners()
-	for a,f in pairs(self.config.actions[GetSpecialization()]) do
+	for a,f in pairs(self.flyoutPlacements[GetSpecialization()]) do
 		self:BindFlyoutToAction(f, a)
 	end
 end
 
 function FloFlyout:IsValidFlyoutId(arg1)
 	local id = tonumber(arg1)
-	return id and self.config.flyouts[id]
+	return id and self.flyouts[id]
 end
 
 function FloFlyout:IsValidSpellPos(flyoutId, arg2)
 	if type(flyoutId) == "string" then flyoutId = tonumber(flyoutId) end
 	local pos = tonumber(arg2)
-	return pos and self.config.flyouts[flyoutId].spells[pos]
+	return pos and self.flyouts[flyoutId].spells[pos]
 end
 
 function FloFlyout:AddFlyout()
-	table.insert(self.config.flyouts, { spells = {}, actionTypes = {}, mountIndex = {}, spellNames = {} })
-	return #self.config.flyouts
+	-- TODO: support macros and battle pets
+	table.insert(self.flyouts, { spells = {}, actionTypes = {}, mountIndex = {}, spellNames = {} })
+	return #self.flyouts
 end
 
 function FloFlyout:RemoveFlyout(flyoutId)
 	if type(flyoutId) == "string" then flyoutId = tonumber(flyoutId) end
-	table.remove(self.config.flyouts, flyoutId)
+	table.remove(self.flyouts, flyoutId)
 	-- shift references
 	for i = 1, 3 do
-		for a,f in pairs(self.config.actions[i]) do
+		for a,f in pairs(self.flyoutPlacements[i]) do
 			if f == flyoutId then
-				self.config.actions[i][a] = nil
+				self.flyoutPlacements[i][a] = nil
 			elseif f > flyoutId then
-				self.config.actions[i][a] = f - 1
+				self.flyoutPlacements[i][a] = f - 1
 			end
 		end
 	end
@@ -706,7 +817,7 @@ end
 function FloFlyout:AddSpell(flyoutId, actionType, spellId)
 	if type(flyoutId) == "string" then flyoutId = tonumber(flyoutId) end
 	if type(spellId) == "string" then spellId = tonumber(spellId) end
-	local flyoutConf = self.config.flyouts[flyoutId]
+	local flyoutConf = self.flyouts[flyoutId]
 	table.insert(flyoutConf.spells, spellId)
 	local newPos = #flyoutConf.spells
 	flyoutConf.actionTypes[newPos] = actionType
@@ -716,7 +827,8 @@ end
 function FloFlyout:RemoveSpell(flyoutId, spellPos)
 	if type(flyoutId) == "string" then flyoutId = tonumber(flyoutId) end
 	if type(spellPos) == "string" then spellPos = tonumber(spellPos) end
-	local flyoutConf = self.config.flyouts[flyoutId]
+	local flyoutConf = self.flyouts[flyoutId]
+	-- TODO: support macros and battle pets
 	table.remove(flyoutConf.spells, spellPos)
 	table.remove(flyoutConf.actionTypes, spellPos)
 	table.remove(flyoutConf.mountIndex, spellPos)
@@ -726,12 +838,12 @@ end
 function FloFlyout:AddAction(actionId, flyoutId)
 	if type(actionId) == "string" then actionId = tonumber(actionId) end
 	if type(flyoutId) == "string" then flyoutId = tonumber(flyoutId) end
-	self.config.actions[GetSpecialization()][actionId] = flyoutId
+	self.flyoutPlacements[GetSpecialization()][actionId] = flyoutId
 end
 
 function FloFlyout:RemoveAction(actionId)
 	if type(actionId) == "string" then actionId = tonumber(actionId) end
-	self.config.actions[GetSpecialization()][actionId] = nil
+	self.flyoutPlacements[GetSpecialization()][actionId] = nil
 end
 
 function FloFlyout:PickupFlyout(flyoutId)
@@ -740,7 +852,7 @@ function FloFlyout:PickupFlyout(flyoutId)
 		return;
 	end
 
-	local flyoutConf = self.config.flyouts[flyoutId]
+	local flyoutConf = self.flyouts[flyoutId]
 	local texture = flyoutConf.icon
 
 	if not texture and flyoutConf.spells[1] then
@@ -755,6 +867,7 @@ function FloFlyout:PickupFlyout(flyoutId)
 	PickupMacro(macroId)
 end
 
+-- TODO: support macros and battle pets
 function FloFlyoutButton_SetTooltip(self)
 	if GetCVar("UberTooltips") == "1" then
 		GameTooltip_SetDefaultAnchor(GameTooltip, self)
@@ -783,6 +896,7 @@ function FloFlyoutButton_SetTooltip(self)
 	end
 end
 
+-- TODO: support macros and battle pets
 function FloFlyoutButton_OnDragStart(self)
 	if InCombatLockdown() then return end
 
@@ -799,6 +913,8 @@ function FloFlyoutButton_OnDragStart(self)
 	elseif actionType == "item" then
 		PickupItem(spell)
 	end
+
+	--print("#### FloFlyoutButton_OnDragStart-->  actionType =",actionType, " spellID =",spell, " mountIndex =,mountIndex")
 
 	local parent = self:GetParent()
 	if parent.IsConfig then
@@ -820,6 +936,9 @@ function FloFlyoutButton_OnReceiveDrag(self)
 
 	local kind, info1, info2, info3 = GetCursorInfo()
 	local actionType, actionData, mountIndex
+
+	-- support battle pets and macros
+	--print("FloFlyoutButton_OnReceiveDrag-->  kind =",kind, " --  info1 =",info1, " --  info1 =",info1, " --  info3 =",info3)
 	if kind == "spell" then
 		actionType = "spell"
 		actionData = info3
@@ -832,7 +951,7 @@ function FloFlyoutButton_OnReceiveDrag(self)
 		actionData = info1
 	end
 	if actionType then
-		local flyoutConf = FloFlyout.config.flyouts[parent.idFlyout]
+		local flyoutConf = FloFlyout.flyouts[parent.idFlyout]
 		local oldActionData = flyoutConf.spells[self:GetID()]
 		local oldActionType = flyoutConf.actionTypes[self:GetID()]
 		local oldMountIndex = flyoutConf.mountIndex[self:GetID()]
@@ -856,6 +975,7 @@ function FloFlyoutButton_OnReceiveDrag(self)
 	end
 end
 
+-- TODO: support macros and battle pets
 function FloFlyoutConfigFlyoutFrame_Update(self, idFlyout)
 	local direction = "RIGHT"
 	local parent = self.parent
@@ -865,11 +985,11 @@ function FloFlyoutConfigFlyoutFrame_Update(self, idFlyout)
 	-- Update all spell buttons for this flyout
 	local prevButton = nil;
 	local numButtons = 0;
-	local spells = FloFlyout.config.flyouts[idFlyout].spells
-	local actionTypes = FloFlyout.config.flyouts[idFlyout].actionTypes
-	local mountIndexes = FloFlyout.config.flyouts[idFlyout].mountIndex
+	local spells = FloFlyout.flyouts[idFlyout].spells
+	local actionTypes = FloFlyout.flyouts[idFlyout].actionTypes
+	local mountIndexes = FloFlyout.flyouts[idFlyout].mountIndex
 
-	for i=1, math.min(#spells+1, 10) do
+	for i=1, math.min(#spells+1, MAX_FLYOUT_SIZE) do
 		local spellID = spells[i]
 		local actionType = actionTypes[i]
 		local mountIndex = mountIndexes[i]
@@ -904,8 +1024,9 @@ function FloFlyoutConfigFlyoutFrame_Update(self, idFlyout)
 
 		button:Show()
 
+		-- TODO: support macros and battle pets
 		if spellID then
-			button.spellID = spellID
+			button.spellID = spellID -- this is read by Bliz code in SpellFlyout.lua
 			button.actionType = actionType
 			button.mountIndex = mountIndex
 			local texture = FloFlyout:GetTexture(actionType, spellID)
@@ -1045,7 +1166,7 @@ function FloFlyoutConfigPane_OnUpdate(self)
 end
 
 function FloFlyout.ConfigPane_Update()
-	local numRows = #FloFlyout.config.flyouts + 1
+	local numRows = #FloFlyout.flyouts + 1
 	HybridScrollFrame_Update(FloFlyoutConfigPane, numRows * EQUIPMENTSET_BUTTON_HEIGHT + 20, FloFlyoutConfigPane:GetHeight())
 
 	local scrollOffset = HybridScrollFrame_GetOffset(FloFlyoutConfigPane)
@@ -1064,7 +1185,7 @@ function FloFlyout.ConfigPane_Update()
 				button.name = i+scrollOffset
 				button.text:SetText(button.name);
 				button.text:SetTextColor(NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b);
-				flyout = FloFlyout.config.flyouts[i+scrollOffset]
+				flyout = FloFlyout.flyouts[i+scrollOffset]
 				texture = flyout.icon
 
 				if not texture and flyout.spells[1] then
@@ -1268,8 +1389,8 @@ function FloFlyout.RefreshFlyoutIconInfo()
 
 	local popup = FloFlyoutConfigDialogPopup
 	if popup.name then
-		local spells = FloFlyout.config.flyouts[popup.name].spells
-		local actionTypes = FloFlyout.config.flyouts[popup.name].actionTypes
+		local spells = FloFlyout.flyouts[popup.name].spells
+		local actionTypes = FloFlyout.flyouts[popup.name].actionTypes
 		for i = 1, #spells do
 			local itemTexture = FloFlyout:GetTexture(actionTypes[i], spells[i])
 			if itemTexture then
@@ -1354,10 +1475,10 @@ function FloFlyoutConfigDialogPopupOkay_OnClick(self, button, pushed)
 
 	if popup.isEdit then
 		-- Modifying a flyout
-		FloFlyout.config.flyouts[popup.name].icon = iconTexture
+		FloFlyout.flyouts[popup.name].icon = iconTexture
 	else
 		-- Saving a new flyout
-		FloFlyout.config.flyouts[FloFlyout:AddFlyout()].icon = iconTexture
+		FloFlyout.flyouts[FloFlyout:AddFlyout()].icon = iconTexture
 	end
 	popup:Hide()
 	FloFlyout.ConfigPane_Update()
@@ -1377,4 +1498,31 @@ function FloFlyoutConfigPopupButton_OnClick(self, button, down)
 	FloFlyout.ConfigDialogPopupOkay_Update()
 end
 
+-------------------------------------------------------------------------------
+-- Utility Functions
+-------------------------------------------------------------------------------
 
+function deepcopy(orig)
+	local orig_type = type(orig)
+	local copy
+	if orig_type == 'table' then
+		copy = {}
+		for orig_key, orig_value in next, orig, nil do
+			copy[deepcopy(orig_key)] = deepcopy(orig_value)
+		end
+		setmetatable(copy, deepcopy(getmetatable(orig)))
+	else -- number, string, boolean, etc
+		copy = orig
+	end
+	return copy
+end
+
+function isEmpty(s)
+	return s == nil or s == ''
+end
+
+-- TODO: support macros and BP
+-- in SpellFlyout.lua
+-- SpellFlyoutButton_OnClick
+-- is responsible for casting spells, but knows nothing of pets or macros... but somehow understands mounts... because mounts are covered by self.spellName
+-- so, I could override it, check for a custom attribute self.petId or self.macroId ... win?

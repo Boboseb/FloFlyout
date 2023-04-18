@@ -124,7 +124,7 @@ local escMenuConfigDef = {
 				return Db.profile.debug
 			end
 		},
-		aceProfileUi = {} -- will be populated by Ace in OnInitialize()
+		--aceProfileUi = {} -- will be populated by Ace in OnInitialize()
 	}
 }
 
@@ -147,7 +147,7 @@ function FloFlyout:OnInitialize()
 	Db = LibStub("AceDB-3.0"):New("FLOFLYOUT_ACCOUNT_CONFIG", defaultConfigOptions)
 
 	-- grabs Ace's profile management UI def and adds it as another submenu of ours
-	escMenuConfigDef.args.aceProfileUi = LibStub("AceDBOptions-3.0"):GetOptionsTable(Db)
+	--escMenuConfigDef.args.aceProfileUi = LibStub("AceDBOptions-3.0"):GetOptionsTable(Db)
 
 	-- Ace-only config registry (required by AceConfigDialog below).  Also adds slash commands {the, stuff, on, the, end}
 	LibStub("AceConfig-3.0"):RegisterOptionsTable(MY_NAME, escMenuConfigDef, { "ff", MY_NAME, string.lower(MY_NAME) })
@@ -156,9 +156,9 @@ function FloFlyout:OnInitialize()
 	LibStub("AceConfigDialog-3.0"):AddToBlizOptions(MY_NAME)
 
 	-- if the user switches to a different profile in the addon config options
-	Db.RegisterCallback(self, "OnProfileChanged", "HandleConfigChanges")
-	Db.RegisterCallback(self, "OnProfileCopied", "HandleConfigChanges")
-	Db.RegisterCallback(self, "OnProfileReset", "HandleConfigChanges")
+	--Db.RegisterCallback(self, "OnProfileChanged", "HandleConfigChanges")
+	--Db.RegisterCallback(self, "OnProfileCopied", "HandleConfigChanges")
+	--Db.RegisterCallback(self, "OnProfileReset", "HandleConfigChanges")
 
 	self:InitializeFlyoutConfigIfEmpty(true)
 	self:InitializePlacementConfigIfEmpty(true)
@@ -191,15 +191,18 @@ function FloFlyout:InitializeFlyoutConfigIfEmpty(mayUseLegacyData)
 	end
 
 	local flyouts
-	local legacyData = mayUseLegacyData and FLOFLYOUT_CONFIG
+
+	-- support older versions of the addon
+	local legacyData = mayUseLegacyData and FLOFLYOUT_CONFIG and FLOFLYOUT_CONFIG.flyouts
 	if legacyData then
-		flyouts = deepcopy(legacyData.flyouts)
+		flyouts = deepcopy(legacyData)
 		fixLegacyFlyoutsNils(flyouts)
+		FLOFLYOUT_CONFIG.flyouts_note = "the flyouts field is old and no longer used by the current version of this addon"
 	else
 		flyouts = deepcopy(DEFAULT_FLOFLYOUT_CONFIG)
 	end
 
-	Db.profile.flyouts = flyouts
+	self:PutFlyoutConfig(flyouts)
 end
 
 function FloFlyout:InitializePlacementConfigIfEmpty(mayUseLegacyData)
@@ -208,24 +211,26 @@ function FloFlyout:InitializePlacementConfigIfEmpty(mayUseLegacyData)
 	end
 
 	local placementsForAllSpecs
-	local legacyData = mayUseLegacyData and FLOFLYOUT_CONFIG
+	local legacyData = mayUseLegacyData and FLOFLYOUT_CONFIG and FLOFLYOUT_CONFIG.actions
 	if legacyData then
-		placementsForAllSpecs = deepcopy(legacyData.actions)
+		placementsForAllSpecs = deepcopy(legacyData)
 		fixLegacyActionsNils(placementsForAllSpecs)
+		FLOFLYOUT_CONFIG.actions_note = "the actions field is old and no longer used by the current version of this addon"
 	else
 		placementsForAllSpecs = deepcopy(DEFAULT_PLACEMENTS_CONFIG)
 	end
 
-	if not Db.profile.placementsPerToonAndSpec then
-		Db.profile.placementsPerToonAndSpec = {}
-	end
+	self:PutFlyoutPlacementsForToon(placementsForAllSpecs)
+end
 
-	local playerId = getIdForCurrentToon()
-	Db.profile.placementsPerToonAndSpec[playerId] = placementsForAllSpecs
+-- the flyout definitions are stored account-wide and thus shared between all toons
+function FloFlyout:PutFlyoutConfig(flyouts)
+	FLOFLYOUT_ACCOUNT_CONFIG.flyouts = flyouts
 end
 
 function FloFlyout:GetFlyoutConfig()
-	return Db.profile.flyouts
+	return FLOFLYOUT_ACCOUNT_CONFIG.flyouts
+	--return Db.profile.flyouts
 end
 
 function FloFlyout:GetSpecificConditionalFlyoutPlacements()
@@ -234,10 +239,23 @@ function FloFlyout:GetSpecificConditionalFlyoutPlacements()
 	return placements and placements[spec]
 end
 
+-- the placement of flyouts on the action bars is stored separately for each toon
+function FloFlyout:PutFlyoutPlacementsForToon(flyoutPlacements)
+	FLOFLYOUT_CONFIG.flyoutPlacements = flyoutPlacements
+
+	--if not Db.profile.placementsPerToonAndSpec then
+	--	Db.profile.placementsPerToonAndSpec = {}
+	--end
+
+	--local playerId = getIdForCurrentToon()
+	--Db.profile.placementsPerToonAndSpec[playerId] = flyoutPlacements
+end
+
 function FloFlyout:GetFlyoutPlacementsForToon()
-	local playerId = getIdForCurrentToon()
-	local ppts = Db.profile.placementsPerToonAndSpec
-	return ppts and ppts[playerId]
+	return FLOFLYOUT_CONFIG.flyoutPlacements
+	--local playerId = getIdForCurrentToon()
+	--local ppts = Db.profile.placementsPerToonAndSpec
+	--return ppts and ppts[playerId]
 end
 
 function getIdForCurrentToon()

@@ -1373,7 +1373,20 @@ function FloFlyoutConfigPane_OnHide(self)
 	FloFlyoutConfigFlyoutFrame:Hide()
 end
 
-function FloFlyoutConfigPane_OnUpdate(self)
+-- throttle OnUpdate because it fires as often as FPS and is very resource intensive
+local C_UI_ON_UPDATE_TIMER_FREQUENCY = 1.0
+local onUpdateTimerForConfigUi = 0
+function FloFlyoutConfigPane_OnUpdate(self, elapsed)
+	onUpdateTimerForConfigUi = onUpdateTimerForConfigUi + elapsed
+	if onUpdateTimerForConfigUi < C_UI_ON_UPDATE_TIMER_FREQUENCY then
+		return
+	end
+	print("FloFlyoutConfigPane_OnUpdate() FloFlyoutConfigPane_onUpdateTimer =", onUpdateTimerForConfigUi)
+	onUpdateTimerForConfigUi = 0
+	FloFlyoutConfigPane_DoUpdate(self)
+end
+
+function FloFlyoutConfigPane_DoUpdate(self)--
 	for i = 1, #self.buttons do
 		local button = self.buttons[i]
 		if button:IsMouseOver() then

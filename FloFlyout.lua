@@ -12,7 +12,10 @@ FloFlyout.openers = {} -- copies of flyouts that sit on the action bars
 -- Constants
 -------------------------------------------------------------------------------
 
-local VERSION = "10.0.16"
+local V_MAJOR = 10
+local V_MINOR = 0
+local V_PATCH = 7
+local VERSION = table.concat({V_MAJOR, V_MINOR, V_PATCH}, ".")
 local NAME = MY_NAME
 local MAX_FLYOUT_SIZE = 20
 local NON_SPEC_SLOT = 5
@@ -168,6 +171,13 @@ function FloFlyout:OnInitialize()
 	initializeOnClickHandlersForFlyouts()
 end
 
+function FloFlyout:UpdateVersionId()
+	FLOFLYOUT_ACCOUNT_CONFIG.v = VERSION
+	FLOFLYOUT_ACCOUNT_CONFIG.V_MAJOR = V_MAJOR
+	FLOFLYOUT_ACCOUNT_CONFIG.V_MINOR = V_MINOR
+	FLOFLYOUT_ACCOUNT_CONFIG.V_PATCH = V_PATCH
+end
+
 --[[
 -- called by Ace during the PLAYER_LOGIN event, when most of the data provided by the game is already present
 function FloFlyoutAce:OnEnable()
@@ -182,10 +192,30 @@ end
 -- FloFlyout Methods
 -------------------------------------------------------------------------------
 
-function FloFlyout:HandleConfigChanges()
-	self:InitializeFlyoutConfigIfEmpty()
-	self:InitializePlacementConfigIfEmpty()
-	self:ApplyConfig()
+-- obsolete - hold-over from when I was using AceDB profile switching
+--function FloFlyout:HandleConfigChanges()
+--	self:InitializeFlyoutConfigIfEmpty()
+--	self:InitializePlacementConfigIfEmpty()
+--	self:ApplyConfig()
+--end
+
+-- compares the config's stored version to input parameters
+function isConfigOlderThan(major, minor, patch)
+	local configMajor = FLOFLYOUT_ACCOUNT_CONFIG.V_MAJOR
+	local configMinor = FLOFLYOUT_ACCOUNT_CONFIG.V_MINOR
+	local configPatch = FLOFLYOUT_ACCOUNT_CONFIG.V_PATCH
+
+	if not (configMajor and configMinor and configPatch) then
+		return true
+	elseif configMajor < major then
+		return true
+	elseif configMinor < minor then
+		return true
+	elseif configPatch < patch then
+		return true
+	else
+		return false
+	end
 end
 
 function FloFlyout:InitializeFlyoutConfigIfEmpty(mayUseLegacyData)

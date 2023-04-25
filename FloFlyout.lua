@@ -3,6 +3,7 @@
 -- You can obtain one at http://mozilla.org/MPL/2.0/.
 
 local MY_NAME, MY_GLOBALS = ...
+local debug = MY_GLOBALS.DEBUG
 local L = FLOFLYOUT_L10N_STRINGS -- auto loaded from locales directory
 
 FloFlyout = LibStub("AceAddon-3.0"):NewAddon(MY_NAME, "AceConsole-3.0", "AceEvent-3.0", "AceHook-3.0")
@@ -27,7 +28,7 @@ local STRATA_DEFAULT = "MEDIUM"
 local STRATA_MAX = "TOOLTIP"
 local DUMMY_MACRO_NAME = "__ffodnd"
 local MAX_GLOBAL_MACRO_ID = 120
-local STRUCT_FLYOUT_DEF = { spells = {}, actionTypes = {}, mountIndex = {}, spellNames = {}, macroOwners = {} } -- "spell" can mean also item, mount, macro, etc.
+local STRUCT_FLYOUT_DEF = { spells={}, actionTypes={}, mountIndex={}, spellNames={}, macroOwners={}, pets={} } -- "spell" can mean also item, mount, macro, etc.
 local BLIZ_BAR_METADATA = {
 	[1]  = {name="Action",              visibleIf="bar:1,nobonusbar:1,nobonusbar:2,nobonusbar:3,nobonusbar:4"}, -- primary "ActionBar" - page #1 - no stance/shapeshift --- ff: actionBarPage = 1
 	[2]  = {name="Action",              visibleIf="bar:2"}, -- primary "ActionBar" - page #2 (regardless of stance/shapeshift) --- ff: actionBarPage = 2
@@ -55,9 +56,9 @@ local DEFAULT_FLOFLYOUT_CONFIG = {
 				[1] = "spell",
 				[2] = "item",
 				[3] = "macro",
-				[4] = "pet"
+				[4] = "battlepet"
 			},
-			spells,
+			spells = {
 				[1] = 8024, -- Flametongue
 				[2] = 8033, -- Frostbite
 				[3] = 8232, -- Windfury
@@ -258,11 +259,14 @@ end
 
 -- the flyout definitions are stored account-wide and thus shared between all toons
 function FloFlyout:PutFlyoutConfig(flyouts)
+	if not FLOFLYOUT_ACCOUNT_CONFIG then
+		FLOFLYOUT_ACCOUNT_CONFIG = {}
+	end
 	FLOFLYOUT_ACCOUNT_CONFIG.flyouts = flyouts
 end
 
 function FloFlyout:GetFlyoutsConfig()
-	return FLOFLYOUT_ACCOUNT_CONFIG.flyouts
+	return FLOFLYOUT_ACCOUNT_CONFIG and FLOFLYOUT_ACCOUNT_CONFIG.flyouts
 	--return Db.profile.flyouts
 end
 
@@ -299,6 +303,10 @@ end
 
 -- the placement of flyouts on the action bars is stored separately for each toon
 function FloFlyout:PutFlyoutPlacementsForToon(flyoutPlacements)
+	if not FLOFLYOUT_CONFIG then
+		FLOFLYOUT_CONFIG = {}
+	end
+
 	FLOFLYOUT_CONFIG.flyoutPlacements = flyoutPlacements
 
 	--if not Db.profile.placementsPerToonAndSpec then
@@ -310,7 +318,7 @@ function FloFlyout:PutFlyoutPlacementsForToon(flyoutPlacements)
 end
 
 function FloFlyout:GetFlyoutPlacementsForToon()
-	return FLOFLYOUT_CONFIG.flyoutPlacements
+	return FLOFLYOUT_CONFIG and FLOFLYOUT_CONFIG.flyoutPlacements
 	--local playerId = getIdForCurrentToon()
 	--local ppts = Db.profile.placementsPerToonAndSpec
 	--return ppts and ppts[playerId]
@@ -540,7 +548,16 @@ function FloFlyoutFrame_OnEvent(self, event, ...)
 	end
 end
 
-function getTexture(actionType, id)
+function getPetNameAndIcon(petGuid)
+	print("getPetNameAndIcon(): petGuid =",petGuid)
+	local speciesID, customName, level, xp, maxXp, displayID, isFavorite, name, icon, petType, creatureID, sourceText, description, isWild, canBattle, tradable, unique, obtainable = C_PetJournal.GetPetInfoByPetID(petGuid)
+	print("getPetNameAndIcon(): petGuid =",petGuid, "| name =", name, "| icon =", icon)
+	return name, icon
+end
+
+function getTexture(actionType, spellId, petId)
+	local id = pickSpellIdOrPetId(actionType, spellId, petId)
+	--print("getTexture(): actionType =",actionType, "| id =",id)
 	if actionType == "spell" then
 		return GetSpellTexture(id)
 	elseif actionType == "item" then
@@ -548,10 +565,13 @@ function getTexture(actionType, id)
 	elseif actionType == "macro" then
 		local _, texture, _ = GetMacroInfo(id)
 		return texture
+	elseif actionType == "battlepet" then
+		local _, icon = getPetNameAndIcon(id)
+		return icon
 	end
 end
 
-function getItemOrSpellNameById(actionType, id)
+function getThingyNameById(actionType, id)
 	if actionType == "spell" then
 		return GetSpellInfo(id)
 	elseif actionType == "item" then
@@ -559,11 +579,13 @@ function getItemOrSpellNameById(actionType, id)
 	elseif actionType == "macro" then
 		local name, _, _ = GetMacroInfo(id)
 		return name
+	elseif actionType == "battlepet" then
+		return getPetNameAndIcon(id)
 	end
 end
 
-function isThingyUsable(id, actionType, mountId, macroOwner)
-	if mountId then
+function isThingyUsable(id, actionType, mountId, macroOwner,petId)
+	if mountId or petId then
 		-- TODO: figure out how to find a mount
 		return true -- GetMountInfoByID(mountId)
 	elseif actionType == "spell" then
@@ -581,9 +603,9 @@ function isMacroGlobal(macroId)
 	return macroId <= MAX_GLOBAL_MACRO_ID
 end
 
-function FloFlyout:BindFlyoutToAction(ffUniqueId, slotIndex)
+function FloFlyout:BindFlyoutToActionBarSlot(flyoutId, btnSlotIndex)
 	-- examine the action/bonus/multi bar
-	local barNum = ActionButtonUtil.GetPageForSlot(slotIndex)
+	local barNum = ActionButtonUtil.GetPageForSlot(btnSlotIndex)
 	local blizBarDef = BLIZ_BAR_METADATA[barNum]
 	assert(blizBarDef, "No "..MY_NAME.." config defined for button bar #"..barNum) -- in case Blizzard adds more bars, complain here clearly.
 	local blizBarName = blizBarDef.name
@@ -591,7 +613,7 @@ function FloFlyout:BindFlyoutToAction(ffUniqueId, slotIndex)
 	local typeActionButton = blizBarDef.classicType -- for WoW classic
 
 	-- examine the button
-	local btnNum = (slotIndex % NUM_ACTIONBAR_BUTTONS)  -- defined in bliz internals ActionButtonUtil.lua
+	local btnNum = (btnSlotIndex % NUM_ACTIONBAR_BUTTONS)  -- defined in bliz internals ActionButtonUtil.lua
 	if (btnNum == 0) then btnNum = NUM_ACTIONBAR_BUTTONS end -- button #12 divided by 12 is 1 remainder 0.  Thus, treat a 0 as a 12
 	local btnName = blizBarName .. "Button" .. btnNum
 	local btnObj = _G[btnName] -- grab the button object from Blizzard's GLOBAL dumping ground
@@ -601,9 +623,9 @@ function FloFlyout:BindFlyoutToAction(ffUniqueId, slotIndex)
 	local direction = barObj and barObj:GetSpellFlyoutDirection() or "UP" -- TODO: fix bug where edit-mode -> change direction doesn't automatically update existing openers
 
 	--local foo = btnObj and "FOUND" or "NiL"
-	--print ("###--->>> ffUniqueId =", ffUniqueId, "barNum =",barNum, "slotId = ", slotIndex, "btnObj =",foo, "blizBarName = ",blizBarName,  "btnName =",btnName,  "btnNum =",btnNum, "direction =",direction, "visibleIf =", visibleIf)
+	--print ("###--->>> ffUniqueId =", ffUniqueId, "barNum =",barNum, "slotId = ", btnSlotIndex, "btnObj =",foo, "blizBarName = ",blizBarName,  "btnName =",btnName,  "btnNum =",btnNum, "direction =",direction, "visibleIf =", visibleIf)
 
-	self:CreateOpener(slotIndex, ffUniqueId, direction, btnObj, visibleIf, typeActionButton)
+	self:CreateOpener(btnSlotIndex, flyoutId, direction, btnObj, visibleIf, typeActionButton)
 end
 
 function Opener_OnReceiveDrag(self)
@@ -691,23 +713,42 @@ function Opener_UpdateFlyout_OnUpdate(self, elapsed)
 	Opener_UpdateFlyout(self)
 end
 
+function pickSpellIdOrPetId(type, spellId, petId)
+	return ((type == "battlepet") and petId) or spellId
+end
+
 function Opener_PreClick(self, button, down)
 	self:SetChecked(not self:GetChecked())
 	local direction = self:GetAttribute("flyoutDirection");
 	local spellList = { strsplit(",", self:GetAttribute("spelllist")) }
 	local typeList = { strsplit(",", self:GetAttribute("typelist")) }
-	local buttonList = { FloFlyoutFrame:GetChildren() }
-	table.remove(buttonList, 1)
-	for i, buttonRef in ipairs(buttonList) do
-		buttonRef.spellID = spellList[i]
-		buttonRef.actionType = typeList[i]
-		local icon = getTexture(typeList[i], spellList[i])
-		_G[buttonRef:GetName().."Icon"]:SetTexture(icon)
-		if not isEmpty(spellList[i]) then
-			SpellFlyoutButton_UpdateCooldown(buttonRef)
-			SpellFlyoutButton_UpdateState(buttonRef)
-			SpellFlyoutButton_UpdateUsable(buttonRef)
-			SpellFlyoutButton_UpdateCount(buttonRef)
+	print("====== /typeList/ =",self:GetAttribute("typelist"))
+	print("~~~~~~ typeList =",typeList)
+	local pets     = { strsplit(",", self:GetAttribute("petlist")) }
+	print("~~~~~~ /pets/ =",self:GetAttribute("petlist"))
+	print("~~~~~~ pets =",pets)
+	local buttonFrames = { FloFlyoutFrame:GetChildren() }
+	table.remove(buttonFrames, 1)
+	for i, buttonFrame in ipairs(buttonFrames) do
+		local type = typeList[i]
+		if not isEmpty(type) then
+			local spellId = spellList[i]
+			local pet = pets[i]
+			print("Opener_PreClick(): i =",i, "| spellID =",spellId,  "| type =",type, "| pet =", pet)
+
+			buttonFrame.spellID = spellId
+			buttonFrame.actionType = type
+			buttonFrame.battlepet = pet
+
+			local icon = getTexture(type, spellId, pet)
+			_G[buttonFrame:GetName().."Icon"]:SetTexture(icon)
+
+			if not isEmpty(spellId) then
+				SpellFlyoutButton_UpdateCooldown(buttonFrame)
+				SpellFlyoutButton_UpdateState(buttonFrame)
+				SpellFlyoutButton_UpdateUsable(buttonFrame)
+				SpellFlyoutButton_UpdateCount(buttonFrame)
+			end
 		end
 	end
 	FloFlyoutFrame.Background.End:ClearAllPoints()
@@ -762,6 +803,10 @@ function Opener_PreClick(self, button, down)
 	FloFlyoutFrame:SetBorderSize(47);
 end
 
+-- ##########################################################################################
+-- CLASS: FloFlyout
+-- ##########################################################################################
+
 local snippet_Opener_Click = [=[
 	local ref = self:GetFrameRef("FloFlyoutFrame")
 	local direction = self:GetAttribute("flyoutDirection")
@@ -782,12 +827,14 @@ local snippet_Opener_Click = [=[
 			ref:SetPoint("LEFT", self, "RIGHT", 0, 0)
 		end
 
-		local spellList = table.new(strsplit(",", self:GetAttribute("spellnamelist")))
+		--local spellIdList = table.new(strsplit(",", self:GetAttribute("spelllist")))
+		local spellNameList = table.new(strsplit(",", self:GetAttribute("spellnamelist")))
 		local typeList = table.new(strsplit(",", self:GetAttribute("typelist")))
+		local pets = table.new(strsplit(",", self:GetAttribute("petlist")))
 		local buttonList = table.new(ref:GetChildren())
 		table.remove(buttonList, 1)
 		for i, buttonRef in ipairs(buttonList) do
-			if spellList[i] then
+			if typeList[i] then
 				buttonRef:ClearAllPoints()
 				if direction == "UP" then
 					if prevButton then
@@ -815,8 +862,30 @@ local snippet_Opener_Click = [=[
 					end
 				end
 
-				buttonRef:SetAttribute("type", typeList[i])
-				buttonRef:SetAttribute(typeList[i], spellList[i])
+				local type = typeList[i]
+				local thisId = ((typeList[i] == "battlepet") and pets[i]) or spellNameList[i]
+
+				-- It appears that SecureActionButtonTemplate
+				-- provides no support for summoning battlepets
+				-- because summoning a battlepet is not a protected action.
+				-- But, here we are, in FloFlyout's SecureActionButtonTemplate code,
+				-- so, fake it with an adhoc macro!
+				if (type == "battlepet") then
+					-- here I was fumbling around guessing at a solution:
+					-- buttonRef:SetAttribute("pet", thisId)
+					-- buttonRef:SetAttribute("companion", thisId)
+					-- buttonRef:SetAttribute("CompanionPet", thisId)
+
+					-- summon the pet via a macro
+					local petMacro = "/run C_PetJournal.SummonPetByGUID(\"" .. thisId .. "\")"
+					buttonRef:SetAttribute("type", "macro")
+					buttonRef:SetAttribute("macrotext", petMacro)
+				else
+					buttonRef:SetAttribute("type", type)
+					buttonRef:SetAttribute(type, thisId)
+
+				end
+
 				buttonRef:Show()
 
 				prevButton = buttonRef
@@ -824,7 +893,7 @@ local snippet_Opener_Click = [=[
 				buttonRef:Hide()
 			end
 		end
-		local numButtons = table.maxn(spellList)
+		local numButtons = table.maxn(typeList)
 		if direction == "UP" or direction == "DOWN" then
 			ref:SetWidth(prevButton:GetWidth())
 			ref:SetHeight((prevButton:GetHeight()+]=]..SPELLFLYOUT_DEFAULT_SPACING..[=[) * numButtons - ]=]..SPELLFLYOUT_DEFAULT_SPACING..[=[ + ]=]..SPELLFLYOUT_INITIAL_SPACING..[=[ + ]=]..SPELLFLYOUT_FINAL_SPACING..[=[)
@@ -838,13 +907,10 @@ local snippet_Opener_Click = [=[
 	end
 ]=]
 
--- ##########################################################################################
--- CLASS: FloFlyout
--- ##########################################################################################
-
 function FloFlyout:CreateOpener(actionId, flyoutId, direction, actionButton, visibleIf, typeActionButton)
 
 	local flyoutConf = self:GetFlyoutConfig(flyoutId)
+	if not flyoutId then return end -- because one toon can delete a flyout while other toons still have it on their bars
 	local name = "FloFlyoutOpener"..actionId
 	local opener = self.openers[name] or CreateFrame("CheckButton", name, actionButton, "ActionButtonTemplate, SecureHandlerClickTemplate")
 	self.openers[name] = opener
@@ -877,26 +943,35 @@ function FloFlyout:CreateOpener(actionId, flyoutId, direction, actionButton, vis
 	opener:SetAttribute("flyoutDirection", direction)
 	opener:SetFrameRef("FloFlyoutFrame", FloFlyoutFrame)
 
-	for i, spellID in ipairs(flyoutConf.spells) do
+	for i, actionType in ipairs(flyoutConf.actionTypes) do
 		if flyoutConf.spellNames[i] == nil then
-			flyoutConf.spellNames[i] = getItemOrSpellNameById(flyoutConf.actionTypes[i], spellID)
+			flyoutConf.spellNames[i] = getThingyNameById(flyoutConf.actionTypes[i], flyoutConf.spells[i] or flyoutConf.pets[i])
 		end
 	end
 
 	local spells = {}
 	local spellNames = {}
 	local actionTypes = {}
-	for i, spellID in ipairs(flyoutConf.spells) do
-		if isThingyUsable(spellID, flyoutConf.actionTypes[i], flyoutConf.mountIndex[i], flyoutConf.macroOwners[i]) then
-			table.insert(spells, flyoutConf.spells[i])
+	local pets = {}
+
+	-- filter out unsuable spell/item/etc
+	for i, actionType in ipairs(flyoutConf.actionTypes) do
+		local spellID = flyoutConf.spells[i]
+		if isThingyUsable(spellID, flyoutConf.actionTypes[i], flyoutConf.mountIndex[i], flyoutConf.macroOwners[i], flyoutConf.pets[i]) then
+			table.insert(spells, flyoutConf.spells[i] ) -- or flyoutConf.pets[i])
 			table.insert(spellNames, flyoutConf.spellNames[i])
 			table.insert(actionTypes, flyoutConf.actionTypes[i])
+			table.insert(pets, flyoutConf.pets[i])
 		end
 	end
 	opener:SetAttribute("spelllist", strjoin(",", unpack(spells)))
 	opener:SetAttribute("spellnamelist", strjoin(",", unpack(spellNames)))
 	opener:SetAttribute("typelist", strjoin(",", unpack(actionTypes)))
-
+	opener:SetAttribute("petlist", strjoin(",", unpack(pets)))
+	DevTools_Dump(flyoutConf)
+	DevTools_Dump(spellNames)
+	DevTools_Dump(actionTypes)
+	DevTools_Dump(pets)
 
 	--[[
         opener:SetAttribute("spelllist", strjoin(",", unpack(flyoutConf.spells)))
@@ -931,8 +1006,8 @@ function FloFlyout:CreateOpener(actionId, flyoutId, direction, actionButton, vis
 		else
 			icon:SetTexture("INTERFACE\\ICONS\\"..flyoutConf.icon)
 		end
-	elseif flyoutConf.spells[1] then
-		local texture = getTexture(flyoutConf.actionTypes[1], flyoutConf.spells[1])
+	elseif flyoutConf.actionTypes[1] then
+		local texture = getTexture(flyoutConf.actionTypes[1], flyoutConf.spells[1], flyoutConf.pets[1])
 		icon:SetTexture(texture)
 	end
 
@@ -956,8 +1031,9 @@ function FloFlyout:ApplyConfig()
 		return
 	end
 	self:ClearOpeners()
-	for a,f in pairs(self:GetSpecificConditionalFlyoutPlacements()) do
-		self:BindFlyoutToAction(f, a)
+	local placements = self:GetSpecificConditionalFlyoutPlacements()
+	for btnSlotIndex, flyoutId in pairs(placements) do
+		self:BindFlyoutToActionBarSlot(flyoutId, btnSlotIndex)
 	end
 end
 
@@ -977,7 +1053,6 @@ function getNewFlyoutDef()
 end
 
 function FloFlyout:AddFlyout()
-	-- TODO: support macros and battle pets
 	local newFlyoutDef = getNewFlyoutDef()
 	local flyoutsConfig = self:GetFlyoutsConfig()
 	table.insert(flyoutsConfig, newFlyoutDef)
@@ -1005,9 +1080,9 @@ function FloFlyout:AddSpell(flyoutId, actionType, spellId)
 	if type(flyoutId) == "string" then flyoutId = tonumber(flyoutId) end
 	if type(spellId) == "string" then spellId = tonumber(spellId) end
 	local flyoutConf = self:GetFlyoutConfig(flyoutId)
-	table.insert(flyoutConf.spells, spellId)
-	local newPos = #flyoutConf.spells
-	flyoutConf.actionTypes[newPos] = actionType
+	table.insert(flyoutConf.actionTypes, actionTypes)
+	local newPos = #flyoutConf.actionTypes
+	flyoutConf.spells[newPos] = spellId
 	return newPos
 end
 
@@ -1021,6 +1096,7 @@ function FloFlyout:RemoveSpell(flyoutId, spellPos)
 	table.remove(flyoutConf.mountIndex, spellPos)
 	table.remove(flyoutConf.spellNames, spellPos)
 	table.remove(flyoutConf.macroOwners, spellPos)
+	table.remove(flyoutConf.pets, spellPos)
 end
 
 function FloFlyout:AddAction(slotId, flyoutId)
@@ -1044,8 +1120,8 @@ function FloFlyout:PickupFlyout(flyoutId)
 	local flyoutConf = self:GetFlyoutConfig(flyoutId)
 	local texture = flyoutConf.icon
 
-	if not texture and flyoutConf.spells[1] then
-		texture = getTexture(flyoutConf.actionTypes[1], flyoutConf.spells[1])
+	if not texture and flyoutConf.actionTypes[1] then
+		texture = getTexture(flyoutConf.actionTypes[1], flyoutConf.spells[1], flyoutConf.pets[1])
 	end
 	if not texture then
 		texture = "INV_Misc_QuestionMark"
@@ -1062,6 +1138,7 @@ end
 
 -- TODO: support macros and battle pets
 function FloFlyoutButton_SetTooltip(self)
+	local thingyId = self.spellID
 	if GetCVar("UberTooltips") == "1" then
 		GameTooltip_SetDefaultAnchor(GameTooltip, self)
 
@@ -1072,12 +1149,17 @@ function FloFlyoutButton_SetTooltip(self)
 			tooltipSetter = GameTooltip.SetItemByID
 		elseif self.actionType == "macro" then
 			tooltipSetter = function(zelf, macroId)
-				local name, icon, body = GetMacroInfo(macroId)
-				--print("tt GetMacroInfo: for ID = ", macroId, "name =",name, "icon =",icon, "body =",body)
+				local name, _, _ = GetMacroInfo(macroId)
+				if not macroId then macroId = "NiL" end
 				return GameTooltip:SetText("Macro: ".. macroId .." " .. (name or "UNKNOWN"))
 			end
+		elseif self.actionType == "battlepet" then
+			thingyId = self.battlepet
+			tooltipSetter = GameTooltip.SetCompanionPet
+			-- print("))))) FloFlyoutButton_SetTooltip(): actionType = battlepet | thingyId =", thingyId)
 		end
-		if tooltipSetter and tooltipSetter(GameTooltip, self.spellID) then
+
+		if tooltipSetter and thingyId and tooltipSetter(GameTooltip, thingyId) then
 			self.UpdateTooltip = FloFlyoutButton_SetTooltip
 		else
 			self.UpdateTooltip = nil
@@ -1089,34 +1171,38 @@ function FloFlyoutButton_SetTooltip(self)
 		else
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		end
-		local spellName = getItemOrSpellNameById(self.actionType, self.spellID)
+		local spellName = getThingyNameById(self.actionType, thingyId)
 		GameTooltip:SetText(spellName, HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b)
 		self.UpdateTooltip = nil
 	end
 end
 
 -- TODO: support macros and battle pets
--- pickup a button from an existing flyout
+-- pickup an existing button from an existing flyout
 function FloFlyoutButton_OnDragStart(self)
 	if InCombatLockdown() then return end
 
 	local actionType = self.actionType
 	local spell = self.spellID
 	local mountIndex = self.mountIndex
+	local pet = self.battlepet
+
 	if actionType == "spell" then
-		if mountIndex == nil then
-			PickupSpell(spell)
-		else
+		if mountIndex then
 			C_MountJournal.Pickup(mountIndex)
+		else
+			PickupSpell(spell)
 		end
 		FloFlyout.mountIndex = mountIndex
 	elseif actionType == "item" then
 		PickupItem(spell)
 	elseif actionType == "macro" then
 		PickupMacro(spell)
+	elseif actionType == "battlepet" then
+		C_PetJournal.PickupPet(pet)
 	end
 
-	--print("#### FloFlyoutButton_OnDragStart-->  actionType =",actionType, " spellID =", spell, " mountIndex =,mountIndex")
+	--print("#### FloFlyoutButton_OnDragStart-->  actionType =",actionType, " spellID =", spell, " mountIndex =", mountIndex, "petId =", pet)
 
 	local parent = self:GetParent()
 	if parent.IsConfig then
@@ -1134,32 +1220,36 @@ hooksecurefunc(C_MountJournal, "Pickup", FloFlyout.MountJournal_PickupHook);
 
 -- add a spell/item/etc to a flyout
 function FloFlyoutButton_OnReceiveDrag(btn)
+	local thingyId, mountIndex, macroOwner, pet
+
 	local flyoutFrame = btn:GetParent()
 	if not flyoutFrame.IsConfig then return end
+
 	local flyoutId = flyoutFrame.idFlyout
 
 	local kind, info1, info2, info3 = GetCursorInfo()
-	local actionType, thingyId, mountIndex, macroOwner
+	local actionType = kind
 
 	-- TODO: distinguish between toys and spells
 	-- TODO: support battle pets and macros
-	--print("FloFlyoutButton_OnReceiveDrag-->  kind =",kind, " --  info1 =",info1, " --  info1 =",info1, " --  info3 =",info3)
+	print("@@@@ FloFlyoutButton_OnReceiveDrag-->  kind =",kind, " --  info1 =",info1, " --  info2 =",info2, " --  info3 =",info3)
 	if kind == "spell" then
-		actionType = "spell"
 		thingyId = info3
 	elseif kind == "mount" then
-		actionType = "spell" -- TODO: Hurm
+		actionType = "spell" -- mounts can be summoned by casting as a spell
 		_, thingyId, _, _, _, _, _, _, _, _, _ = C_MountJournal.GetDisplayedMountInfo(FloFlyout.mountIndex);
 		mountIndex = FloFlyout.mountIndex
 	elseif kind == "item" then
-		actionType = "item"
 		thingyId = info1
 	elseif kind == "macro" then
-		actionType = "macro"
 		thingyId = info1
 		if not isMacroGlobal(thingyId) then
 			macroOwner = getIdForCurrentToon()
 		end
+	elseif kind == "battlepet" then
+		pet = info1
+	else
+		actionType = nil
 	end
 
 	if actionType then
@@ -1169,12 +1259,16 @@ function FloFlyoutButton_OnReceiveDrag(btn)
 		local oldThingyId   = flyoutConf.spells[btnIndex]
 		local oldActionType = flyoutConf.actionTypes[btnIndex]
 		local oldMountIndex = flyoutConf.mountIndex[btnIndex]
+		local oldPet        = flyoutConf.pets[btnIndex]
 
 		flyoutConf.spells[btnIndex] = thingyId
 		flyoutConf.actionTypes[btnIndex] = actionType
 		flyoutConf.mountIndex[btnIndex] = mountIndex
-		flyoutConf.spellNames[btnIndex] = getItemOrSpellNameById(actionType, thingyId)
+		flyoutConf.spellNames[btnIndex] = getThingyNameById(actionType, thingyId or pet)
 		flyoutConf.macroOwners[btnIndex] = macroOwner
+		flyoutConf.pets[btnIndex] = pet
+
+		--print("@#$* FloFlyoutButton_OnReceiveDrag-->  btnIndex =",btnIndex, "| kind =",kind, "| thingyId =",thingyId, "| petId =", pet)
 
 		-- drop the dragged spell/item/etc
 		ClearCursor()
@@ -1183,15 +1277,17 @@ function FloFlyoutButton_OnReceiveDrag(btn)
 
 		-- update the cursor to show the existing spell/item/etc (if any)
 		if oldActionType == "spell" then
-			if oldMountIndex == nil then
-				PickupSpell(oldThingyId)
-			else
+			if oldMountIndex then
 				C_MountJournal.Pickup(oldMountIndex)
+			else
+				PickupSpell(oldThingyId)
 			end
 		elseif oldActionType == "item" then
 			PickupItem(oldThingyId)
 		elseif oldActionType == "macro" then
 			PickupMacro(oldThingyId)
+		elseif oldActionType == "battlepet" then
+			C_PetJournal.PickupPet(oldPet)
 		end
 	else
 		print("sorry, unsupported type:", kind)
@@ -1216,11 +1312,13 @@ function FloFlyoutConfigFlyoutFrame_Update(self, idFlyout)
 	local spells = flyoutConfig and flyoutConfig.spells
 	local actionTypes = flyoutConfig and flyoutConfig.actionTypes
 	local mountIndexes = flyoutConfig and flyoutConfig.mountIndex
+	local pets = flyoutConfig and flyoutConfig.pets
 
-	for i=1, math.min(#spells+1, MAX_FLYOUT_SIZE) do
-		local spellID = spells[i]
+	for i=1, math.min(#actionTypes+1, MAX_FLYOUT_SIZE) do
+		local spellId = spells[i]
 		local actionType = actionTypes[i]
 		local mountIndex = mountIndexes[i]
+		local pet        = pets[i]
 		local button = _G["FloFlyoutConfigFlyoutFrameButton"..numButtons+1]
 
 		button:ClearAllPoints()
@@ -1253,16 +1351,19 @@ function FloFlyoutConfigFlyoutFrame_Update(self, idFlyout)
 		button:Show()
 
 		-- TODO: support macros and battle pets
-		if spellID then
-			button.spellID = spellID -- this is read by Bliz code in SpellFlyout.lua
+		if actionType then
+			button.spellID = spellId -- this is read by Bliz code in SpellFlyout.lua
 			button.actionType = actionType
 			button.mountIndex = mountIndex
-			local texture = getTexture(actionType, spellID)
+			button.battlepet  = pet
+			local texture = getTexture(actionType, spellId, pet)
 			_G[button:GetName().."Icon"]:SetTexture(texture)
-			SpellFlyoutButton_UpdateCooldown(button)
-			SpellFlyoutButton_UpdateState(button)
-			SpellFlyoutButton_UpdateUsable(button)
-			SpellFlyoutButton_UpdateCount(button)
+			if (spellId) then
+				SpellFlyoutButton_UpdateCooldown(button)
+				SpellFlyoutButton_UpdateState(button)
+				SpellFlyoutButton_UpdateUsable(button)
+				SpellFlyoutButton_UpdateCount(button)
+			end
 		else
 			_G[button:GetName().."Icon"]:SetTexture(nil)
 			button.spellID = nil
@@ -1418,8 +1519,8 @@ function FloFlyout.ConfigPane_Update()
 				flyout = FloFlyout:GetFlyoutConfig(pos)
 				texture = flyout.icon
 
-				if not texture and flyout.spells[1] then
-					texture = getTexture(flyout.actionTypes[1], flyout.spells[1])
+				if not texture and flyout.actionTypes[1] then
+					texture = getTexture(flyout.actionTypes[1], flyout.spells[1], flyout.pets[1])
 				end
 				if texture then
 					if(type(texture) == "number") then
@@ -1629,8 +1730,9 @@ function FloFlyout.RefreshFlyoutIconInfo()
 	if popup.name then
 		local spells = FloFlyout:GetFlyoutsConfig()[popup.name].spells
 		local actionTypes = FloFlyout:GetFlyoutsConfig()[popup.name].actionTypes
-		for i = 1, #spells do
-			local itemTexture = getTexture(actionTypes[i], spells[i])
+		local pets = FloFlyout:GetFlyoutsConfig()[popup.name].pets
+		for i = 1, #actionTypes do
+			local itemTexture = getTexture(actionTypes[i], spells[i], pets[i])
 			if itemTexture then
 				FC_ICON_FILENAMES[index] = gsub( strupper(itemTexture), "INTERFACE\\ICONS\\", "" )
 				if FC_ICON_FILENAMES[index] then

@@ -537,7 +537,7 @@ function FloFlyoutFrame_OnEvent(self, event, ...)
 	elseif event == "SPELL_FLYOUT_UPDATE" then
 		local i = 1
 		local button = _G[self:GetName().."Button"..i]
-		while (button and button:IsShown() and button.spellID) do
+		while (button and button:IsShown() and not isEmpty(button.spellID)) do
 			SpellFlyoutButton_UpdateCooldown(button)
 			SpellFlyoutButton_UpdateState(button)
 			SpellFlyoutButton_UpdateUsable(button)
@@ -557,7 +557,7 @@ end
 
 function getTexture(actionType, spellId, petId)
 	local id = pickSpellIdOrPetId(actionType, spellId, petId)
-	--print("getTexture(): actionType =",actionType, "| id =",id)
+	print("getTexture(): actionType =",actionType, "| spellId =",spellId, "| petId =",petId, "| id =",id)
 	if actionType == "spell" then
 		return GetSpellTexture(id)
 	elseif actionType == "item" then
@@ -720,13 +720,22 @@ end
 function Opener_PreClick(self, button, down)
 	self:SetChecked(not self:GetChecked())
 	local direction = self:GetAttribute("flyoutDirection");
-	local spellList = { strsplit(",", self:GetAttribute("spelllist")) }
-	local typeList = { strsplit(",", self:GetAttribute("typelist")) }
-	print("====== /typeList/ =",self:GetAttribute("typelist"))
-	print("~~~~~~ typeList =",typeList)
-	local pets     = { strsplit(",", self:GetAttribute("petlist")) }
+
+	local spellList = fknSplit(self:GetAttribute("spelllist"))
+	print("~~~~~~ /spellList/ =",self:GetAttribute("spellList"))
+	print("~~~~~~ spellList -->")
+	DevTools_Dump(spellList)
+
+	local typeList = fknSplit(self:GetAttribute("typelist"))
+	print("~~~~~~ /typeList/ =",self:GetAttribute("typelist"))
+	print("~~~~~~ typeList -->")
+	DevTools_Dump(typeList)
+
+	local pets     = fknSplit(self:GetAttribute("petlist"))
 	print("~~~~~~ /pets/ =",self:GetAttribute("petlist"))
-	print("~~~~~~ pets =",pets)
+	print("~~~~~~ pets -->")
+	DevTools_Dump(pets)
+
 	local buttonFrames = { FloFlyoutFrame:GetChildren() }
 	table.remove(buttonFrames, 1)
 	for i, buttonFrame in ipairs(buttonFrames) do
@@ -807,7 +816,63 @@ end
 -- CLASS: FloFlyout
 -- ##########################################################################################
 
+local DELIMITER = "\a"
+local EMPTY_ELEMENT = "\t" -- strjoin skips "" as if they were nil, but "" isn't treated as nil. omfg Lua, get it together.
+
+function fknSplit(str)
+	local omfgDumbassLanguage = { strsplit(DELIMITER, str or "") }
+	--print ("XXX-1 fknSplit() str =", str, "| result -->")
+	DevTools_Dump(omfgDumbassLanguage)
+	omfgDumbassLanguage = stripEmptyElements(omfgDumbassLanguage)
+	print ("XXX-22 fknSplit() result -->")
+	DevTools_Dump(omfgDumbassLanguage)
+	return omfgDumbassLanguage
+end
+
+function fknJoin(array)
+	array = array or {}
+	local n = lastIndex(array)
+	print ("OOOOO fknJoin() n =",n, "| array -->")
+	DevTools_Dump(array)
+	local omfgDumbAssLanguage = {}
+	for i=1,n,1 do
+		print("$$$$$ fknJoin() i =",i, "| array[",i,"] =",array[i])
+		omfgDumbAssLanguage[i] = array[i] or EMPTY_ELEMENT
+	end
+	local result = strjoin(DELIMITER,unpack(omfgDumbAssLanguage,1,n)) or ""
+	print("$$$$= fknJoin() #omfgDumbAssLanguage =",#omfgDumbAssLanguage, "result =",result)
+	return result
+end
+
+-- because lua arrays turn into tables when an element = nil
+function lastIndex(table)
+	local biggest = 0
+	for k,v in pairs(table) do
+		if (k > biggest) then
+			biggest = k
+		end
+	end
+	return biggest
+end
+
+function stripEmptyElements(table)
+	--local result = {}
+	for k,v in ipairs(table) do
+		--print("***** stripEmptyElements() k =",k, "| v =",v)
+		if (v == EMPTY_ELEMENT) then
+			table[k] = nil
+			--print(v, "KILL NIL")
+		--else
+			--result[k] = v
+			--print(v, "nope")
+		end
+	end
+	return table
+end
+
 local snippet_Opener_Click = [=[
+	local DELIMITER = "]=]..DELIMITER..[=["
+	local EMPTY_ELEMENT = "]=]..EMPTY_ELEMENT..[=["
 	local ref = self:GetFrameRef("FloFlyoutFrame")
 	local direction = self:GetAttribute("flyoutDirection")
 	local prevButton = nil;
@@ -827,10 +892,10 @@ local snippet_Opener_Click = [=[
 			ref:SetPoint("LEFT", self, "RIGHT", 0, 0)
 		end
 
-		--local spellIdList = table.new(strsplit(",", self:GetAttribute("spelllist")))
-		local spellNameList = table.new(strsplit(",", self:GetAttribute("spellnamelist")))
-		local typeList = table.new(strsplit(",", self:GetAttribute("typelist")))
-		local pets = table.new(strsplit(",", self:GetAttribute("petlist")))
+		--local spellIdList = table.new(strsplit(DELIMITER, self:GetAttribute("spelllist")))
+		local spellNameList = table.new(strsplit(DELIMITER, self:GetAttribute("spellnamelist")or""))
+		local typeList = table.new(strsplit(DELIMITER, self:GetAttribute("typelist")or""))
+		local pets = table.new(strsplit(DELIMITER, self:GetAttribute("petlist")or""))
 		local buttonList = table.new(ref:GetChildren())
 		table.remove(buttonList, 1)
 		for i, buttonRef in ipairs(buttonList) do
@@ -863,6 +928,11 @@ local snippet_Opener_Click = [=[
 				end
 
 				local type = typeList[i]
+				local pet = pets[i]
+				if (pet == EMPTY_ELEMENT) then
+					pet = nil
+				end
+
 				local thisId = ((typeList[i] == "battlepet") and pets[i]) or spellNameList[i]
 
 				-- It appears that SecureActionButtonTemplate
@@ -954,20 +1024,21 @@ function FloFlyout:CreateOpener(actionId, flyoutId, direction, actionButton, vis
 	local actionTypes = {}
 	local pets = {}
 
-	-- filter out unsuable spell/item/etc
+	-- filter out unsuable spell/item/etc - use the "actionType" field because it never has missing elements, unlike spells and pets
 	for i, actionType in ipairs(flyoutConf.actionTypes) do
 		local spellID = flyoutConf.spells[i]
 		if isThingyUsable(spellID, flyoutConf.actionTypes[i], flyoutConf.mountIndex[i], flyoutConf.macroOwners[i], flyoutConf.pets[i]) then
-			table.insert(spells, flyoutConf.spells[i] ) -- or flyoutConf.pets[i])
-			table.insert(spellNames, flyoutConf.spellNames[i])
-			table.insert(actionTypes, flyoutConf.actionTypes[i])
-			table.insert(pets, flyoutConf.pets[i])
+			-- table.insert won't preserve correct indicies of arrays with nil elements, so do this[instead]
+			spells[i]      = flyoutConf.spells[i]
+			spellNames[i]  = flyoutConf.spellNames[i]
+			actionTypes[i] = flyoutConf.actionTypes[i]
+			pets[i]        = flyoutConf.pets[i]
 		end
 	end
-	opener:SetAttribute("spelllist", strjoin(",", unpack(spells)))
-	opener:SetAttribute("spellnamelist", strjoin(",", unpack(spellNames)))
-	opener:SetAttribute("typelist", strjoin(",", unpack(actionTypes)))
-	opener:SetAttribute("petlist", strjoin(",", unpack(pets)))
+	opener:SetAttribute("spelllist", fknJoin(spells))
+	opener:SetAttribute("spellnamelist", fknJoin(spellNames))
+	opener:SetAttribute("typelist", fknJoin(actionTypes))
+	opener:SetAttribute("petlist", fknJoin(pets))
 	DevTools_Dump(flyoutConf)
 	DevTools_Dump(spellNames)
 	DevTools_Dump(actionTypes)
@@ -1315,7 +1386,7 @@ function FloFlyoutConfigFlyoutFrame_Update(self, idFlyout)
 	local pets = flyoutConfig and flyoutConfig.pets
 
 	for i=1, math.min(#actionTypes+1, MAX_FLYOUT_SIZE) do
-		local spellId = spells[i]
+		local spellId    = spells[i]
 		local actionType = actionTypes[i]
 		local mountIndex = mountIndexes[i]
 		local pet        = pets[i]
@@ -1352,13 +1423,13 @@ function FloFlyoutConfigFlyoutFrame_Update(self, idFlyout)
 
 		-- TODO: support macros and battle pets
 		if actionType then
-			button.spellID = spellId -- this is read by Bliz code in SpellFlyout.lua
+			button.spellID = spellId -- this is read by Bliz code in SpellFlyout.lua which expects only numeric
 			button.actionType = actionType
 			button.mountIndex = mountIndex
 			button.battlepet  = pet
 			local texture = getTexture(actionType, spellId, pet)
 			_G[button:GetName().."Icon"]:SetTexture(texture)
-			if (spellId) then
+			if spellId then -- should never actually be "empty" but would instead be nil - so prolly do not need the isEmpty
 				SpellFlyoutButton_UpdateCooldown(button)
 				SpellFlyoutButton_UpdateState(button)
 				SpellFlyoutButton_UpdateUsable(button)
@@ -1496,8 +1567,8 @@ end
 
 function FloFlyout.ConfigPane_Update()
 	local flyouts = FloFlyout:GetFlyoutsConfig()
-	local numRows = #flyouts + 1
-	HybridScrollFrame_Update(FloFlyoutConfigPane, numRows * EQUIPMENTSET_BUTTON_HEIGHT + 20, FloFlyoutConfigPane:GetHeight())
+	local flyoutsCount = #flyouts + 1
+	HybridScrollFrame_Update(FloFlyoutConfigPane, flyoutsCount * EQUIPMENTSET_BUTTON_HEIGHT + 20, FloFlyoutConfigPane:GetHeight()) -- TODO: is this the source of the too-tall bug
 
 	local scrollOffset = HybridScrollFrame_GetOffset(FloFlyoutConfigPane)
 	local buttons = FloFlyoutConfigPane.buttons
@@ -1506,12 +1577,12 @@ function FloFlyout.ConfigPane_Update()
 	local texture, button, flyout
 	for i = 1, #buttons do
 		local pos = i+scrollOffset
-		if pos <= numRows then
+		if pos <= flyoutsCount then
 			button = buttons[i]
 			buttons[i]:Show()
 			button:Enable()
 
-			if pos < numRows then
+			if pos < flyoutsCount then
 				-- Normal flyout button
 				button.name = pos
 				button.text:SetText(button.name);
@@ -1565,7 +1636,7 @@ function FloFlyout.ConfigPane_Update()
 				buttons[i].BgMiddle:SetPoint("TOP")
 			end
 
-			if (pos) == numRows then
+			if (pos) == flyoutsCount then
 				buttons[i].BgBottom:Show()
 				buttons[i].BgMiddle:SetPoint("BOTTOM", buttons[i].BgBottom, "TOP")
 			else

@@ -1532,7 +1532,7 @@ function FloFlyoutConfigPane_OnUpdate(self, elapsed)
 	if onUpdateTimerForConfigUi < C_UI_ON_UPDATE_TIMER_FREQUENCY then
 		return
 	end
-	print("FloFlyoutConfigPane_OnUpdate() FloFlyoutConfigPane_onUpdateTimer =", onUpdateTimerForConfigUi)
+	--print("FloFlyoutConfigPane_OnUpdate() FloFlyoutConfigPane_onUpdateTimer =", onUpdateTimerForConfigUi)
 	onUpdateTimerForConfigUi = 0
 	FloFlyoutConfigPane_DoUpdate(self)
 end

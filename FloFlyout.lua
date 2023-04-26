@@ -549,15 +549,15 @@ function FloFlyoutFrame_OnEvent(self, event, ...)
 end
 
 function getPetNameAndIcon(petGuid)
-	print("getPetNameAndIcon(): petGuid =",petGuid)
+	--print("getPetNameAndIcon(): petGuid =",petGuid)
 	local speciesID, customName, level, xp, maxXp, displayID, isFavorite, name, icon, petType, creatureID, sourceText, description, isWild, canBattle, tradable, unique, obtainable = C_PetJournal.GetPetInfoByPetID(petGuid)
-	print("getPetNameAndIcon(): petGuid =",petGuid, "| name =", name, "| icon =", icon)
+	--print("getPetNameAndIcon(): petGuid =",petGuid, "| name =", name, "| icon =", icon)
 	return name, icon
 end
 
 function getTexture(actionType, spellId, petId)
 	local id = pickSpellIdOrPetId(actionType, spellId, petId)
-	print("getTexture(): actionType =",actionType, "| spellId =",spellId, "| petId =",petId, "| id =",id)
+	--print("getTexture(): actionType =",actionType, "| spellId =",spellId, "| petId =",petId, "| id =",id)
 	if actionType == "spell" then
 		return GetSpellTexture(id)
 	elseif actionType == "item" then
@@ -722,19 +722,19 @@ function Opener_PreClick(self, button, down)
 	local direction = self:GetAttribute("flyoutDirection");
 
 	local spellList = fknSplit(self:GetAttribute("spelllist"))
-	print("~~~~~~ /spellList/ =",self:GetAttribute("spellList"))
-	print("~~~~~~ spellList -->")
-	DevTools_Dump(spellList)
+	--print("~~~~~~ /spellList/ =",self:GetAttribute("spellList"))
+	--print("~~~~~~ spellList -->")
+	--DevTools_Dump(spellList)
 
 	local typeList = fknSplit(self:GetAttribute("typelist"))
-	print("~~~~~~ /typeList/ =",self:GetAttribute("typelist"))
-	print("~~~~~~ typeList -->")
-	DevTools_Dump(typeList)
+	--print("~~~~~~ /typeList/ =",self:GetAttribute("typelist"))
+	--print("~~~~~~ typeList -->")
+	--DevTools_Dump(typeList)
 
 	local pets     = fknSplit(self:GetAttribute("petlist"))
-	print("~~~~~~ /pets/ =",self:GetAttribute("petlist"))
-	print("~~~~~~ pets -->")
-	DevTools_Dump(pets)
+	--print("~~~~~~ /pets/ =",self:GetAttribute("petlist"))
+	--print("~~~~~~ pets -->")
+	--DevTools_Dump(pets)
 
 	local buttonFrames = { FloFlyoutFrame:GetChildren() }
 	table.remove(buttonFrames, 1)
@@ -743,7 +743,7 @@ function Opener_PreClick(self, button, down)
 		if not isEmpty(type) then
 			local spellId = spellList[i]
 			local pet = pets[i]
-			print("Opener_PreClick(): i =",i, "| spellID =",spellId,  "| type =",type, "| pet =", pet)
+			--print("Opener_PreClick(): i =",i, "| spellID =",spellId,  "| type =",type, "| pet =", pet)
 
 			buttonFrame.spellID = spellId
 			buttonFrame.actionType = type
@@ -819,28 +819,20 @@ end
 local DELIMITER = "\a"
 local EMPTY_ELEMENT = "\t" -- strjoin skips "" as if they were nil, but "" isn't treated as nil. omfg Lua, get it together.
 
-function fknSplit(str)
-	local omfgDumbassLanguage = { strsplit(DELIMITER, str or "") }
-	--print ("XXX-1 fknSplit() str =", str, "| result -->")
-	DevTools_Dump(omfgDumbassLanguage)
-	omfgDumbassLanguage = stripEmptyElements(omfgDumbassLanguage)
-	print ("XXX-22 fknSplit() result -->")
-	DevTools_Dump(omfgDumbassLanguage)
-	return omfgDumbassLanguage
-end
-
+-- I had to create this function to replace lua's strjoin() because
+-- lua poops the bed in the strsplit(strjoin(array)) roundtrip whenever the "array" is actually a table because an element was set to nil
 function fknJoin(array)
 	array = array or {}
 	local n = lastIndex(array)
-	print ("OOOOO fknJoin() n =",n, "| array -->")
-	DevTools_Dump(array)
+	--print ("OOOOO fknJoin() n =",n, "| array -->")
+	--DevTools_Dump(array)
 	local omfgDumbAssLanguage = {}
 	for i=1,n,1 do
-		print("$$$$$ fknJoin() i =",i, "| array[",i,"] =",array[i])
+		--print("$$$$$ fknJoin() i =",i, "| array[",i,"] =",array[i])
 		omfgDumbAssLanguage[i] = array[i] or EMPTY_ELEMENT
 	end
 	local result = strjoin(DELIMITER,unpack(omfgDumbAssLanguage,1,n)) or ""
-	print("$$$$= fknJoin() #omfgDumbAssLanguage =",#omfgDumbAssLanguage, "result =",result)
+	--print("$$$$= fknJoin() #omfgDumbAssLanguage =",#omfgDumbAssLanguage, "result =",result)
 	return result
 end
 
@@ -855,16 +847,17 @@ function lastIndex(table)
 	return biggest
 end
 
+-- ensures then special characters introduced by fknJoin()
+function fknSplit(str)
+	local omfgDumbassLanguage = { strsplit(DELIMITER, str or "") }
+	omfgDumbassLanguage = stripEmptyElements(omfgDumbassLanguage)
+	return omfgDumbassLanguage
+end
+
 function stripEmptyElements(table)
-	--local result = {}
 	for k,v in ipairs(table) do
-		--print("***** stripEmptyElements() k =",k, "| v =",v)
 		if (v == EMPTY_ELEMENT) then
 			table[k] = nil
-			--print(v, "KILL NIL")
-		--else
-			--result[k] = v
-			--print(v, "nope")
 		end
 	end
 	return table
@@ -892,7 +885,6 @@ local snippet_Opener_Click = [=[
 			ref:SetPoint("LEFT", self, "RIGHT", 0, 0)
 		end
 
-		--local spellIdList = table.new(strsplit(DELIMITER, self:GetAttribute("spelllist")))
 		local spellNameList = table.new(strsplit(DELIMITER, self:GetAttribute("spellnamelist")or""))
 		local typeList = table.new(strsplit(DELIMITER, self:GetAttribute("typelist")or""))
 		local pets = table.new(strsplit(DELIMITER, self:GetAttribute("petlist")or""))
@@ -928,11 +920,6 @@ local snippet_Opener_Click = [=[
 				end
 
 				local type = typeList[i]
-				local pet = pets[i]
-				if (pet == EMPTY_ELEMENT) then
-					pet = nil
-				end
-
 				local thisId = ((typeList[i] == "battlepet") and pets[i]) or spellNameList[i]
 
 				-- It appears that SecureActionButtonTemplate
@@ -1035,14 +1022,12 @@ function FloFlyout:CreateOpener(actionId, flyoutId, direction, actionButton, vis
 			pets[i]        = flyoutConf.pets[i]
 		end
 	end
+
+	-- attach string representations of the "arrays" to the opener because Blizzard "secure" templates don't let us attach the actual array
 	opener:SetAttribute("spelllist", fknJoin(spells))
 	opener:SetAttribute("spellnamelist", fknJoin(spellNames))
 	opener:SetAttribute("typelist", fknJoin(actionTypes))
 	opener:SetAttribute("petlist", fknJoin(pets))
-	DevTools_Dump(flyoutConf)
-	DevTools_Dump(spellNames)
-	DevTools_Dump(actionTypes)
-	DevTools_Dump(pets)
 
 	--[[
         opener:SetAttribute("spelllist", strjoin(",", unpack(flyoutConf.spells)))
@@ -1161,7 +1146,6 @@ function FloFlyout:RemoveSpell(flyoutId, spellPos)
 	if type(flyoutId) == "string" then flyoutId = tonumber(flyoutId) end
 	if type(spellPos) == "string" then spellPos = tonumber(spellPos) end
 	local flyoutConf = self:GetFlyoutConfig(flyoutId)
-	-- TODO: support macros and battle pets
 	table.remove(flyoutConf.spells, spellPos)
 	table.remove(flyoutConf.actionTypes, spellPos)
 	table.remove(flyoutConf.mountIndex, spellPos)
@@ -1207,7 +1191,6 @@ end
 -- CLASS: FloFlyoutButton
 -- ##########################################################################################
 
--- TODO: support macros and battle pets
 function FloFlyoutButton_SetTooltip(self)
 	local thingyId = self.spellID
 	if GetCVar("UberTooltips") == "1" then
@@ -1248,7 +1231,6 @@ function FloFlyoutButton_SetTooltip(self)
 	end
 end
 
--- TODO: support macros and battle pets
 -- pickup an existing button from an existing flyout
 function FloFlyoutButton_OnDragStart(self)
 	if InCombatLockdown() then return end
@@ -1302,8 +1284,7 @@ function FloFlyoutButton_OnReceiveDrag(btn)
 	local actionType = kind
 
 	-- TODO: distinguish between toys and spells
-	-- TODO: support battle pets and macros
-	print("@@@@ FloFlyoutButton_OnReceiveDrag-->  kind =",kind, " --  info1 =",info1, " --  info2 =",info2, " --  info3 =",info3)
+	--print("@@@@ FloFlyoutButton_OnReceiveDrag-->  kind =",kind, " --  info1 =",info1, " --  info2 =",info2, " --  info3 =",info3)
 	if kind == "spell" then
 		thingyId = info3
 	elseif kind == "mount" then
@@ -1369,7 +1350,6 @@ end
 -- CLASS: FloFlyoutConfigFlyoutFrame
 -- ##########################################################################################
 
--- TODO: support macros and battle pets
 function FloFlyoutConfigFlyoutFrame_Update(self, idFlyout)
 	local direction = "RIGHT"
 	local parent = self.parent
@@ -1421,15 +1401,14 @@ function FloFlyoutConfigFlyoutFrame_Update(self, idFlyout)
 
 		button:Show()
 
-		-- TODO: support macros and battle pets
 		if actionType then
-			button.spellID = spellId -- this is read by Bliz code in SpellFlyout.lua which expects only numeric
+			button.spellID = spellId -- this is read by Bliz code in SpellFlyout.lua which expects only numbers
 			button.actionType = actionType
 			button.mountIndex = mountIndex
 			button.battlepet  = pet
 			local texture = getTexture(actionType, spellId, pet)
 			_G[button:GetName().."Icon"]:SetTexture(texture)
-			if spellId then -- should never actually be "empty" but would instead be nil - so prolly do not need the isEmpty
+			if spellId then
 				SpellFlyoutButton_UpdateCooldown(button)
 				SpellFlyoutButton_UpdateState(button)
 				SpellFlyoutButton_UpdateUsable(button)
@@ -1933,9 +1912,3 @@ end
 function isEmpty(s)
 	return s == nil or s == ''
 end
-
--- TODO: support macros and BP
--- in SpellFlyout.lua
--- SpellFlyoutButton_OnClick
--- is responsible for casting spells, but knows nothing of pets or macros... but somehow understands mounts... because mounts are covered by self.spellName
--- so, I could override it, check for a custom attribute self.petId or self.macroId ... win?
